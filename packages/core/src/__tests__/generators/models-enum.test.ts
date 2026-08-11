@@ -107,4 +107,57 @@ describe('Enum Generation', () => {
     const matches = result.content.match(/@JsonValue\('unknown'\)/g);
     expect(matches?.length).toBe(1);
   });
+
+  it('should serialize numeric enum values as numbers', () => {
+    const result = generator.generateEnum(
+      'DayOfWeek',
+      [1, 2, 3, 4, 5, 6, 7],
+      'Day of the week (1-7, where 1 is Monday and 7 is Sunday)'
+    );
+
+    // Quoting these would send "1" instead of 1 and break decoding on the way back
+    expect(result.content).toContain('@JsonValue(1)');
+    expect(result.content).toContain('@JsonValue(7)');
+    expect(result.content).not.toContain("@JsonValue('1')");
+    expect(result.content).toContain('value1');
+    expect(result.content).toContain('value7');
+  });
+
+  it('should expose numeric enums through a num-based extension', () => {
+    const result = generator.generateEnum('DayOfWeek', [1, 2, 3], undefined);
+
+    expect(result.content).toContain('num get value');
+    expect(result.content).toContain('static DayOfWeek? fromValue(num? value)');
+    expect(result.content).toContain('return 1;');
+    expect(result.content).toContain('case 1:');
+
+    expect(result.content).not.toContain('String get value');
+    expect(result.content).not.toContain('fromValue(String? value)');
+  });
+
+  it('should not add an unknown fallback to numeric enums', () => {
+    const result = generator.generateEnum('HttpCode', [200, 404, 500], undefined);
+
+    // No numeric value is safe to reserve as a sentinel
+    expect(result.content).not.toContain('unknown');
+    expect(result.content).toContain('if (value == null) return null;');
+    expect(result.content).toContain('return null;');
+  });
+
+  it('should keep numeric-looking string values quoted', () => {
+    const result = generator.generateEnum('HttpStatus', ['200', '404'], undefined);
+
+    expect(result.content).toContain("@JsonValue('200')");
+    expect(result.content).not.toContain('@JsonValue(200)');
+    expect(result.content).toContain('String get value');
+    expect(result.content).toContain("@JsonValue('unknown')");
+  });
+
+  it('should fall back to the string branch for mixed value types', () => {
+    const result = generator.generateEnum('Mixed', [1, 'two'], undefined);
+
+    expect(result.content).toContain("@JsonValue('1')");
+    expect(result.content).toContain("@JsonValue('two')");
+    expect(result.content).toContain('String get value');
+  });
 });

@@ -287,9 +287,17 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
   /**
    * Generate enum from schema
    */
-  generateEnum(name: string, values: string[], description?: string): GeneratedFile {
+  generateEnum(
+    name: string,
+    values: (string | number | null)[],
+    description?: string
+  ): GeneratedFile {
     const enumName = TypeMapper.toDartClassName(name);
     const fileName = TypeMapper.toSnakeCase(enumName);
+
+    // Numeric enums have to serialize as numbers, so they take a separate
+    // template branch. Only real JSON numbers qualify - '200' stays a string.
+    const isNumeric = values.length > 0 && values.every(value => typeof value === 'number');
     
     // Convert enum values to valid Dart enum names
     const enumValues = values.map(value => {
@@ -346,8 +354,10 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
 
     // Add 'unknown' fallback value for forward compatibility
     // This ensures that if the backend adds new enum values, the client won't crash
+    // Numeric enums have no spare value to use as a sentinel, so fromValue
+    // returns null for them instead
     const hasUnknown = enumValues.some(v => v.name === 'unknown');
-    if (!hasUnknown) {
+    if (!hasUnknown && !isNumeric) {
       enumValues.push({
         name: 'unknown',
         value: 'unknown',
@@ -358,7 +368,8 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
     const templateData = {
       enumName,
       description,
-      values: enumValues
+      values: enumValues,
+      isNumeric
     };
     
     const content = this.templateManager.render('freezed-enum', templateData);
