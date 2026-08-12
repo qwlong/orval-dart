@@ -121,7 +121,9 @@ function extractInlineEnums(
 
             // Add to schemas as an enum schema
             schemas[enumTypeName] = {
-              type: 'string',
+              // Carry the declared type through - overwriting it with 'string'
+              // would hide numeric enums from the generator
+              type: propSchema.type,
               enum: propSchema.enum,
               description: propSchema.description || `Enum for ${propName}`
             };
@@ -144,7 +146,7 @@ function extractInlineEnums(
 
         // Add to schemas as an enum schema
         schemas[enumTypeName] = {
-          type: 'string',
+          type: propSchema.type,
           enum: propSchema.enum,
           description: propSchema.description || `Enum for ${propName}`
         };
@@ -241,7 +243,7 @@ function processParametersForEnums(
 
       // Add to schemas with context-specific name
       schemas[uniqueEnumTypeName] = {
-        type: schema.type || 'string',
+        type: schema.type,
         enum: schema.enum,
         description: paramObj.description || `Enum for ${paramObj.name} parameter`
       };
@@ -267,7 +269,7 @@ function processParametersForEnums(
 
       // Add to schemas with context-specific name (for the items enum)
       schemas[uniqueEnumTypeName] = {
-        type: schema.items.type || 'string',
+        type: schema.items.type,
         enum: schema.items.enum,
         description: paramObj.description || `Enum for ${paramObj.name} parameter items`
       };
@@ -348,8 +350,9 @@ export async function generateModels(
     if (isEnum(schema)) {
       const enumFile = generator.generateEnum(
         name,
-        schema.enum as string[],
-        schema.description
+        schema.enum as (string | number | null)[],
+        schema.description,
+        schema.type as string | undefined
       );
       files.push(enumFile);
       return;

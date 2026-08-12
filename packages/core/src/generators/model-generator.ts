@@ -287,9 +287,24 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
   /**
    * Generate enum from schema
    */
-  generateEnum(name: string, values: string[], description?: string): GeneratedFile {
+  generateEnum(
+    name: string,
+    values: (string | number | null)[],
+    description?: string,
+    type?: string
+  ): GeneratedFile {
     const enumName = TypeMapper.toDartClassName(name);
     const fileName = TypeMapper.toSnakeCase(enumName);
+
+    // Numeric enums have to serialize as numbers, so they take a separate
+    // template branch. The declared type is what settles it: YAML parses an
+    // unquoted `enum: [1, 2]` into JS numbers even under `type: string`, where
+    // the server still sends "1".
+    const nonNullValues = values.filter(value => value !== null);
+    const isNumeric =
+      (type === undefined || type === 'integer' || type === 'number') &&
+      nonNullValues.length > 0 &&
+      nonNullValues.every(value => typeof value === 'number');
     
     // Convert enum values to valid Dart enum names
     const enumValues = values.map(value => {
@@ -346,8 +361,10 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
 
     // Add 'unknown' fallback value for forward compatibility
     // This ensures that if the backend adds new enum values, the client won't crash
+    // Numeric enums have no spare value to use as a sentinel, so fromValue
+    // returns null for them instead
     const hasUnknown = enumValues.some(v => v.name === 'unknown');
-    if (!hasUnknown) {
+    if (!hasUnknown && !isNumeric) {
       enumValues.push({
         name: 'unknown',
         value: 'unknown',
@@ -355,10 +372,18 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
       });
     }
 
+    // json_serializable decodes a null source to Dart null without consulting
+    // the value map, so a nullValue member would be unreachable through
+    // fromJson. Dart's own null is the single spelling for absent instead.
+    const renderedValues = isNumeric
+      ? enumValues.filter(v => v.name !== 'nullValue')
+      : enumValues;
+
     const templateData = {
       enumName,
       description,
-      values: enumValues
+      values: renderedValues,
+      isNumeric
     };
     
     const content = this.templateManager.render('freezed-enum', templateData);
