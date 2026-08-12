@@ -175,13 +175,19 @@ describe('Enum Generation', () => {
     const result = generator.generateEnum('DayOfWeek', [1, 2, null], undefined, 'integer');
 
     expect(result.content).toContain('@JsonValue(1)');
-    expect(result.content).toContain('@JsonValue(null)');
-    expect(result.content).not.toContain("@JsonValue('null')");
+    expect(result.content).toContain('@JsonValue(2)');
+    expect(result.content).not.toContain("@JsonValue('1')");
+    expect(result.content).toContain('num get value');
+  });
 
-    // The null member makes the accessor nullable, and fromValue maps null
-    // onto it instead of bailing out
-    expect(result.content).toContain('num? get value');
-    expect(result.content).toContain('if (value == null) return DayOfWeek.nullValue;');
+  it('should leave null out of numeric enum members', () => {
+    const result = generator.generateEnum('DayOfWeek', [1, 2, null], undefined, 'integer');
+
+    // json_serializable decodes a null source to Dart null without consulting
+    // the value map, so a nullValue member could never come back from fromJson
+    expect(result.content).not.toContain('nullValue');
+    expect(result.content).not.toContain('@JsonValue(null)');
+    expect(result.content).toContain('if (value == null) return null;');
   });
 
   it('should fall back to the string branch for mixed value types', () => {

@@ -243,7 +243,7 @@ function processParametersForEnums(
 
       // Add to schemas with context-specific name
       schemas[uniqueEnumTypeName] = {
-        type: schema.type || 'string',
+        type: schema.type,
         enum: schema.enum,
         description: paramObj.description || `Enum for ${paramObj.name} parameter`
       };
@@ -269,7 +269,7 @@ function processParametersForEnums(
 
       // Add to schemas with context-specific name (for the items enum)
       schemas[uniqueEnumTypeName] = {
-        type: schema.items.type || 'string',
+        type: schema.items.type,
         enum: schema.items.enum,
         description: paramObj.description || `Enum for ${paramObj.name} parameter items`
       };

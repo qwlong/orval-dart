@@ -372,12 +372,18 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
       });
     }
 
+    // json_serializable decodes a null source to Dart null without consulting
+    // the value map, so a nullValue member would be unreachable through
+    // fromJson. Dart's own null is the single spelling for absent instead.
+    const renderedValues = isNumeric
+      ? enumValues.filter(v => v.name !== 'nullValue')
+      : enumValues;
+
     const templateData = {
       enumName,
       description,
-      values: enumValues,
-      isNumeric,
-      hasNullValue: enumValues.some(v => v.name === 'nullValue')
+      values: renderedValues,
+      isNumeric
     };
     
     const content = this.templateManager.render('freezed-enum', templateData);

@@ -23,7 +23,7 @@ enum {{enumName}} {
 /// Extension methods for {{enumName}}
 extension {{enumName}}Extension on {{enumName}} {
 {{#if isNumeric}}
-  num{{#if hasNullValue}}?{{/if}} get value {
+  num get value {
     switch (this) {
 {{#each values}}
       case {{../enumName}}.{{name}}:
@@ -33,13 +33,11 @@ extension {{enumName}}Extension on {{enumName}} {
   }
 
   static {{enumName}}? fromValue(num? value) {
-    if (value == null) return {{#if hasNullValue}}{{enumName}}.nullValue{{else}}null{{/if}};
+    if (value == null) return null;
     switch (value) {
 {{#each values}}
-{{#unless (eq name "nullValue")}}
       case {{value}}:
         return {{../enumName}}.{{name}};
-{{/unless}}
 {{/each}}
       default:
         return null;
