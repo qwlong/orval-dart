@@ -350,7 +350,7 @@ export async function generateModels(
     if (isEnum(schema)) {
       const enumFile = generator.generateEnum(
         name,
-        schema.enum as (string | number | null)[],
+        schema.enum as (string | number | boolean | null)[],
         schema.description,
         schema.type as string | undefined
       );

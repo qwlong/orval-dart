@@ -197,4 +197,116 @@ describe('Enum Generation', () => {
     expect(result.content).toContain("@JsonValue('two')");
     expect(result.content).toContain('String get value');
   });
+
+  describe('member names Dart would reject', () => {
+    it('should keep the sign and the decimal point of numeric values', () => {
+      const result = generator.generateEnum('Scale', [-1, -2.5, 1.5, 15], undefined, 'number');
+
+      // Sanitizing used to drop both, leaving -1 named '1' and landing 1.5 on 15
+      expect(result.content).toContain('valueMinus1');
+      expect(result.content).toContain('valueMinus2Point5');
+      expect(result.content).toContain('value1Point5');
+      expect(result.content).toContain('value15');
+    });
+
+    it('should keep exponent notation legal', () => {
+      const result = generator.generateEnum('Big', [1e21], undefined, 'number');
+
+      expect(result.content).toContain('value1ePlus21');
+    });
+
+    it('should prefix Dart reserved words', () => {
+      const result = generator.generateEnum('Reserved', ['new', 'class', 'default'], undefined, 'string');
+
+      expect(result.content).toContain('valueNew');
+      expect(result.content).toContain('valueClass');
+      expect(result.content).toContain('valueDefault');
+      // The @JsonValue keeps the original spelling
+      expect(result.content).toContain("@JsonValue('new')");
+    });
+
+    it('should prefix names an enum already declares', () => {
+      const result = generator.generateEnum('Builtins', ['values', 'index'], undefined, 'string');
+
+      // `values` is generated for every enum, `index` comes from Enum
+      expect(result.content).toContain('valueValues');
+      expect(result.content).toContain('valueIndex');
+    });
+
+    it('should leave a member named value alone', () => {
+      const result = generator.generateEnum('Named', ['value'], undefined, 'string');
+
+      // Enum members are static and the extension getter is an instance
+      // member, so these do not collide
+      expect(result.content).toContain('@JsonValue(\'value\')\n  value');
+    });
+
+    it('should give sanitized-away values a usable name', () => {
+      const result = generator.generateEnum('Unicode', ['日本', '-'], undefined, 'string');
+
+      // Both sanitize down to an empty string, which is not an identifier
+      expect(result.content).toContain('@JsonValue(\'日本\')\n  value');
+      expect(result.content).toContain('@JsonValue(\'-\')\n  value2');
+    });
+  });
+
+  describe('colliding member names', () => {
+    it('should suffix values that differ only in case', () => {
+      const result = generator.generateEnum('Status', ['Active', 'active'], undefined, 'string');
+
+      expect(result.content).toContain('  active,');
+      expect(result.content).toContain('  active2');
+    });
+
+    it('should suffix values that differ only in separators', () => {
+      const result = generator.generateEnum('Sep', ['a-b', 'a_b'], undefined, 'string');
+
+      expect(result.content).toContain('  aB,');
+      expect(result.content).toContain('  aB2');
+    });
+
+    it('should collapse repeated values onto one member', () => {
+      const result = generator.generateEnum('Same', [1.0, 1], undefined, 'number');
+
+      // YAML parses both to the same number, and two members sharing a
+      // @JsonValue would make the generated map ambiguous
+      expect(result.content.match(/@JsonValue\(1\)/g)?.length).toBe(1);
+      expect(result.content).not.toContain('value12');
+    });
+  });
+
+  describe('boolean enums', () => {
+    it('should serialize boolean values as literals', () => {
+      const result = generator.generateEnum('Toggle', [true, false], undefined, 'boolean');
+
+      expect(result.content).toContain('@JsonValue(true)');
+      expect(result.content).toContain('@JsonValue(false)');
+      expect(result.content).not.toContain("@JsonValue('true')");
+
+      // true and false are keywords, so the members need prefixing
+      expect(result.content).toContain('valueTrue');
+      expect(result.content).toContain('valueFalse');
+    });
+
+    it('should expose boolean enums through a bool-based extension', () => {
+      const result = generator.generateEnum('Toggle', [true, false], undefined, 'boolean');
+
+      expect(result.content).toContain('bool get value');
+      expect(result.content).toContain('static Toggle? fromValue(bool? value)');
+
+      // A switch over bool covers every case; a default clause would be
+      // reported as unreachable
+      expect(result.content).not.toContain('default:');
+      expect(result.content).not.toContain('unknown');
+    });
+  });
+
+  it('should drop a null value from a string enum', () => {
+    const result = generator.generateEnum('Nullable', ['null', null], undefined, 'string');
+
+    // The string 'null' keeps its member; the actual null gets none, since
+    // json_serializable decodes a null source to Dart null regardless
+    expect(result.content.match(/@JsonValue\('null'\)/g)?.length).toBe(1);
+    expect(result.content).not.toContain('@JsonValue(null)');
+  });
 });

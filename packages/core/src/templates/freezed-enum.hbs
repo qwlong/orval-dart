@@ -8,7 +8,7 @@ enum {{enumName}} {
 {{#if description}}
   /// {{description}}
 {{/if}}
-{{#if ../isNumeric}}
+{{#if ../isLiteral}}
   @JsonValue({{value}})
 {{else}}
   @JsonValue('{{value}}')
@@ -22,8 +22,8 @@ enum {{enumName}} {
 
 /// Extension methods for {{enumName}}
 extension {{enumName}}Extension on {{enumName}} {
-{{#if isNumeric}}
-  num get value {
+{{#if isLiteral}}
+  {{valueType}} get value {
     switch (this) {
 {{#each values}}
       case {{../enumName}}.{{name}}:
@@ -32,15 +32,17 @@ extension {{enumName}}Extension on {{enumName}} {
     }
   }
 
-  static {{enumName}}? fromValue(num? value) {
+  static {{enumName}}? fromValue({{valueType}}? value) {
     if (value == null) return null;
     switch (value) {
 {{#each values}}
       case {{value}}:
         return {{../enumName}}.{{name}};
 {{/each}}
+{{#unless isBoolean}}
       default:
         return null;
+{{/unless}}
     }
   }
 {{else}}
