@@ -121,7 +121,9 @@ function extractInlineEnums(
 
             // Add to schemas as an enum schema
             schemas[enumTypeName] = {
-              type: 'string',
+              // Carry the declared type through - overwriting it with 'string'
+              // would hide numeric enums from the generator
+              type: propSchema.type,
               enum: propSchema.enum,
               description: propSchema.description || `Enum for ${propName}`
             };
@@ -144,7 +146,7 @@ function extractInlineEnums(
 
         // Add to schemas as an enum schema
         schemas[enumTypeName] = {
-          type: 'string',
+          type: propSchema.type,
           enum: propSchema.enum,
           description: propSchema.description || `Enum for ${propName}`
         };
@@ -349,7 +351,8 @@ export async function generateModels(
       const enumFile = generator.generateEnum(
         name,
         schema.enum as (string | number | null)[],
-        schema.description
+        schema.description,
+        schema.type as string | undefined
       );
       files.push(enumFile);
       return;

@@ -285,4 +285,47 @@ describe('Inline Enum Generation', () => {
     expect(enumFile!.content).toContain('productionV2');
     expect(enumFile!.content).toContain("@JsonValue('404-error')");
   });
+
+  it('should keep the declared type when hoisting an inline numeric enum', async () => {
+    const spec: OpenAPIObject = {
+      openapi: '3.0.0',
+      info: {
+        title: 'Test API',
+        version: '1.0.0'
+      },
+      paths: {},
+      components: {
+        schemas: {
+          CreateWorkerUnavailabilityDto: {
+            type: 'object',
+            required: ['dayOfWeek'],
+            properties: {
+              dayOfWeek: {
+                type: 'number',
+                description: 'Day of the week (1-7, where 1 is Monday and 7 is Sunday)',
+                enum: [1, 2, 3, 4, 5, 6, 7]
+              }
+            }
+          }
+        }
+      }
+    };
+
+    const files = await generateModels(spec, {
+      input: spec,
+      output: { target: './test', mode: 'split', client: 'dio' }
+    } as any);
+
+    const enumFile = files.find(
+      f => f.path === 'models/create_worker_unavailability_dto_day_of_week_enum.f.dart'
+    );
+    expect(enumFile).toBeDefined();
+
+    // Hoisting used to overwrite the declared type with 'string', which turned
+    // numeric enums into string ones
+    expect(enumFile!.content).toContain('@JsonValue(1)');
+    expect(enumFile!.content).toContain('@JsonValue(7)');
+    expect(enumFile!.content).not.toContain("@JsonValue('1')");
+    expect(enumFile!.content).toContain('num get value');
+  });
 });

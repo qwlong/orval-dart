@@ -153,6 +153,37 @@ describe('Enum Generation', () => {
     expect(result.content).toContain("@JsonValue('unknown')");
   });
 
+  it('should respect a declared string type over the value runtime type', () => {
+    // YAML parses an unquoted `enum: [1, 2]` into JS numbers, but under
+    // `type: string` the server still sends "1"
+    const result = generator.generateEnum('Status', [1, 2], undefined, 'string');
+
+    expect(result.content).toContain("@JsonValue('1')");
+    expect(result.content).not.toContain('@JsonValue(1)');
+    expect(result.content).toContain('String get value');
+  });
+
+  it('should treat integer and number types as numeric', () => {
+    for (const type of ['integer', 'number']) {
+      const result = generator.generateEnum('Code', [1, 2], undefined, type);
+      expect(result.content).toContain('@JsonValue(1)');
+      expect(result.content).toContain('num get value');
+    }
+  });
+
+  it('should keep nullable numeric enums numeric', () => {
+    const result = generator.generateEnum('DayOfWeek', [1, 2, null], undefined, 'integer');
+
+    expect(result.content).toContain('@JsonValue(1)');
+    expect(result.content).toContain('@JsonValue(null)');
+    expect(result.content).not.toContain("@JsonValue('null')");
+
+    // The null member makes the accessor nullable, and fromValue maps null
+    // onto it instead of bailing out
+    expect(result.content).toContain('num? get value');
+    expect(result.content).toContain('if (value == null) return DayOfWeek.nullValue;');
+  });
+
   it('should fall back to the string branch for mixed value types', () => {
     const result = generator.generateEnum('Mixed', [1, 'two'], undefined);
 

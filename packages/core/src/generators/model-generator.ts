@@ -290,14 +290,21 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
   generateEnum(
     name: string,
     values: (string | number | null)[],
-    description?: string
+    description?: string,
+    type?: string
   ): GeneratedFile {
     const enumName = TypeMapper.toDartClassName(name);
     const fileName = TypeMapper.toSnakeCase(enumName);
 
     // Numeric enums have to serialize as numbers, so they take a separate
-    // template branch. Only real JSON numbers qualify - '200' stays a string.
-    const isNumeric = values.length > 0 && values.every(value => typeof value === 'number');
+    // template branch. The declared type is what settles it: YAML parses an
+    // unquoted `enum: [1, 2]` into JS numbers even under `type: string`, where
+    // the server still sends "1".
+    const nonNullValues = values.filter(value => value !== null);
+    const isNumeric =
+      (type === undefined || type === 'integer' || type === 'number') &&
+      nonNullValues.length > 0 &&
+      nonNullValues.every(value => typeof value === 'number');
     
     // Convert enum values to valid Dart enum names
     const enumValues = values.map(value => {
@@ -369,7 +376,8 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
       enumName,
       description,
       values: enumValues,
-      isNumeric
+      isNumeric,
+      hasNullValue: enumValues.some(v => v.name === 'nullValue')
     };
     
     const content = this.templateManager.render('freezed-enum', templateData);
