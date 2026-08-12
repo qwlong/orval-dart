@@ -1,3 +1,12 @@
+## [0.10.3](https://github.com/qwlong/dorval/compare/v0.10.2...v0.10.3) (2026-08-12)
+
+
+### Bug Fixes
+
+* **core:** align parameter enums and drop null members from numeric enums ([85a1448](https://github.com/qwlong/dorval/commit/85a14484ea87de5920b8a893531a82523f075c1b))
+* **core:** gate numeric enums on the declared type ([4363306](https://github.com/qwlong/dorval/commit/436330657271d004244a743c1dfb2ef1c954f65c))
+* **core:** serialize numeric enums as numbers ([5d226d4](https://github.com/qwlong/dorval/commit/5d226d4b73b942bc5aa9a17166577c47460ed9b3))
+
 ## [0.10.2](https://github.com/qwlong/dorval/compare/v0.10.1...v0.10.2) (2026-01-21)
 
 
