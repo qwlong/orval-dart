@@ -164,7 +164,8 @@ export class ParamsGenerator {
         type: headerType,
         required: header.required,
         description: header.description,
-        jsonKey: header.dartName !== header.originalName ? header.originalName : undefined
+        jsonKey: header.dartName !== header.originalName ? header.originalName : undefined,
+        dateOnly: header.dateOnly
       };
     });
 
@@ -173,7 +174,8 @@ export class ParamsGenerator {
       fileName,
       description: `Headers for ${methodName}`,
       properties,
-      imports: Array.from(imports)
+      imports: Array.from(imports),
+      hasDateOnlyConverter: properties.some(prop => prop.dateOnly)
     };
 
     const content = this.renderHeadersModel(model);

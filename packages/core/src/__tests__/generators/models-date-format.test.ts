@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { generateModels } from '../../generators/models';
 import { EndpointGenerator } from '../../generators/endpoint-generator';
+import { HeadersGenerator } from '../../generators/headers-generator';
 import { ParamsGenerator } from '../../generators/params-generator';
 
 const spec = {
@@ -71,6 +72,26 @@ function generateQueryParams(operation: any): string {
   const file = new ParamsGenerator().generateQueryParamsModel('exportPdf', queryParams);
   expect(file).not.toBeNull();
   return file!.content;
+}
+
+/**
+ * Header models have two renderers - the default one in ParamsGenerator and
+ * the consolidating one in HeadersGenerator - and both feed the same template.
+ */
+function generateHeaders(operation: any): { params: string; consolidated: string } {
+  const headers = new EndpointGenerator()
+    .generateGetMethod('exportPdf', '/reports/pdf', operation)
+    .headers;
+
+  const params = new ParamsGenerator().generateHeadersModel('exportPdf', headers);
+  expect(params).not.toBeNull();
+
+  const headersGenerator = new HeadersGenerator();
+  headersGenerator.getHeaderModelName('exportPdf', headers);
+  const consolidated = headersGenerator.generateHeaderModel('exportPdf', headers);
+  expect(consolidated).not.toBeNull();
+
+  return { params: params!.content, consolidated: consolidated!.content };
 }
 
 describe('Date format serialization', () => {
@@ -142,6 +163,41 @@ describe('Date format serialization', () => {
     });
 
     expect(content).toContain('@_DateOnlyConverter()\n    List<DateTime>? days,');
+  });
+
+  it('should annotate date headers through both renderers', () => {
+    const { params, consolidated } = generateHeaders({
+      operationId: 'exportPdf',
+      parameters: [
+        {
+          name: 'X-Effective-Date',
+          in: 'header',
+          required: true,
+          schema: { type: 'string', format: 'date' }
+        },
+        { name: 'X-Tenant', in: 'header', required: true, schema: { type: 'string' } }
+      ],
+      responses: { '200': { description: 'ok' } }
+    });
+
+    for (const content of [params, consolidated]) {
+      expect(content).toContain('class _DateOnlyConverter implements JsonConverter<DateTime, String>');
+      expect(content).toContain('@_DateOnlyConverter()\n    required DateTime xEffectiveDate,');
+      expect(content).toContain('required String xTenant,');
+    }
+  });
+
+  it('should not emit the converter for headers without dates', () => {
+    const { params, consolidated } = generateHeaders({
+      operationId: 'exportPdf',
+      parameters: [
+        { name: 'X-Tenant', in: 'header', required: true, schema: { type: 'string' } }
+      ],
+      responses: { '200': { description: 'ok' } }
+    });
+
+    expect(params).not.toContain('_DateOnlyConverter');
+    expect(consolidated).not.toContain('_DateOnlyConverter');
   });
 
   it('should not emit the converter for query parameters without dates', () => {

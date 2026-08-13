@@ -5,6 +5,10 @@ import '../{{this}}';
 
 part '{{fileName}}.f.freezed.dart';
 part '{{fileName}}.f.g.dart';
+{{#if hasDateOnlyConverter}}
+
+{{> dateOnlyConverter}}
+{{/if}}
 
 {{#if description}}
 {{{dartDoc description}}}
@@ -18,6 +22,9 @@ abstract class {{className}} with _${{className}} {
     {{/if}}
     {{#if jsonKey}}
     @JsonKey(name: {{{jsonKeyQuote jsonKey}}})
+    {{/if}}
+    {{#if dateOnly}}
+    @_DateOnlyConverter()
     {{/if}}
     {{! Headers: fields with default or required don't get nullable }}
     {{#if defaultValue}}@Default({{{defaultValue}}}) {{{type}}} {{{name}}},{{else}}{{#if required}}required {{{type}}} {{{name}}},{{else}}{{{type}}}? {{{name}}},{{/if}}{{/if}}

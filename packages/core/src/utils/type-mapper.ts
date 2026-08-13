@@ -456,12 +456,6 @@ export class TypeMapper {
       annotations.push(`name: '${propertyName}'`);
     }
 
-    // Add fromJson/toJson for DateTime
-    const type = this.mapType(schema);
-    if (type === 'DateTime') {
-      annotations.push('fromJson: _dateTimeFromJson, toJson: _dateTimeToJson');
-    }
-
     if (annotations.length > 0) {
       return `@JsonKey(${annotations.join(', ')})`;
     }

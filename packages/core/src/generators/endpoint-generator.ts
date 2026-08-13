@@ -78,6 +78,8 @@ export interface HeaderParameter {
   required: boolean;
   type?: string;
   description?: string;
+  /** `format: date` - serializes as YYYY-MM-DD rather than a full timestamp */
+  dateOnly?: boolean;
 }
 
 export interface ErrorResponse {
@@ -422,7 +424,8 @@ export class EndpointGenerator {
             originalName: p.name,
             required: p.required || false,
             type: dartType,
-            description: p.description
+            description: p.description,
+            dateOnly: TypeMapper.isDateOnlySchema(p.schema)
           });
           break;
       }
