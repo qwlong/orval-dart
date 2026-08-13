@@ -350,6 +350,17 @@ describe('Enum Generation', () => {
       expect(files.find(f => f.path.includes('holder_flag_enum'))).toBeUndefined();
     });
 
+    it('should read the scalar type off the values when the schema omits it', async () => {
+      const spec = specWith({ Flag: { enum: [true, false] }, Ratio: { enum: [1.5, 2.5] } });
+      const files = await generateModels(spec, {
+        input: spec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
+
+      expect(files.find(f => f.path === 'models/flag.f.dart')!.content).toContain('typedef Flag = bool;');
+      expect(files.find(f => f.path === 'models/ratio.f.dart')!.content).toContain('typedef Ratio = double;');
+    });
+
     it('should still generate integer enums', async () => {
       const files = await generateModels(integerSpec, {
         input: integerSpec,

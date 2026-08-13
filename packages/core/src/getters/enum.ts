@@ -7,7 +7,7 @@ import { OpenAPIV3 } from 'openapi-types';
 
 export interface EnumValue {
   name: string;
-  value: string | number | null;
+  value: string | number | boolean | null;
   description?: string;
 }
 
@@ -138,7 +138,7 @@ export function uniqueEnumMemberName(name: string, usedNames: Set<string>): stri
  * Names are not guaranteed unique on their own - run the result through
  * uniqueEnumMemberName when building a whole enum.
  */
-export function enumValueToDartName(value: string | number | null): string {
+export function enumValueToDartName(value: string | number | boolean | null): string {
   if (value === null || value === 'null') {
     return 'nullValue';
   }
@@ -155,6 +155,37 @@ export function enumValueToDartName(value: string | number | null): string {
 }
 
 /**
+ * Build the member list for an enum: one member per distinct value, each named
+ * legally and uniquely within the enum.
+ *
+ * A null value gets no member. json_serializable decodes a null source to Dart
+ * null without consulting the value map, so the member would be unreachable
+ * through fromJson.
+ *
+ * Repeated values get one member between them. YAML parses `[1.0, 1]` and
+ * `[0, -0]` to a single number each, and two members sharing a @JsonValue would
+ * make the generated map ambiguous.
+ */
+export function buildEnumMembers(values: (string | number | boolean | null)[]): EnumValue[] {
+  const seenValues = new Set<string | number | boolean>();
+  const usedNames = new Set<string>();
+
+  return values
+    .filter(value => {
+      if (value === null || seenValues.has(value)) {
+        return false;
+      }
+      seenValues.add(value);
+      return true;
+    })
+    .map(value => ({
+      name: uniqueEnumMemberName(enumValueToDartName(value), usedNames),
+      value,
+      description: value === '' ? 'Empty string' : undefined
+    }));
+}
+
+/**
  * Process enum schema into structured data
  */
 export function getEnumData(
@@ -165,12 +196,9 @@ export function getEnumData(
     return null;
   }
   
+  // Could be extended with x-enum-descriptions
   const rawValues = getEnumValues(schema);
-  const values: EnumValue[] = rawValues.map(value => ({
-    name: enumValueToDartName(value),
-    value: value,
-    description: undefined // Could be extended with x-enum-descriptions
-  }));
+  const values: EnumValue[] = buildEnumMembers(rawValues);
   
   // Determine enum type
   const isString = rawValues.every(v => typeof v === 'string' || v === null);
