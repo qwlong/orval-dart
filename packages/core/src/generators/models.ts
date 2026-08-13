@@ -223,8 +223,11 @@ function processParametersForEnums(
     const pathPart = TypeMapper.toDartClassName(pathContext);
     const paramName = TypeMapper.toDartClassName(paramObj.name);
 
-    // Format: {Method}{PathContext}{ParamName}Enum
-    const uniqueEnumTypeName = `${methodPrefix}${pathPart}${paramName}Enum`;
+    // Format: {Method}{PathContext}{ParamName}Enum, normalised the same way
+    // endpoint-generator normalises the type it refers to
+    const uniqueEnumTypeName = TypeMapper.toDartClassName(
+      `${methodPrefix}${pathPart}${paramName}Enum`
+    );
 
     // Check if this parameter has an inline enum (not a reference)
     //

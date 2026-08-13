@@ -430,6 +430,41 @@ describe('Enum Generation', () => {
     });
   });
 
+  describe('a header parameter with an enum', () => {
+    const headerSpec = {
+      openapi: '3.0.0',
+      info: { title: 'Test API', version: '1.0.0' },
+      paths: {
+        '/s': {
+          get: {
+            operationId: 'getStatus',
+            parameters: [
+              { name: 'X-Mode', in: 'header', schema: { type: 'string', enum: ['a', 'b'] } }
+            ],
+            responses: { '200': { description: 'ok' } }
+          }
+        }
+      },
+      components: { schemas: {} }
+    } as any;
+
+    it('should spell the type the same way the model declares it', async () => {
+      const files = await generateDartCode({
+        input: headerSpec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
+
+      // The declaration goes through toDartClassName, which reads XMo as an
+      // acronym - the reference has to be normalised the same way
+      const headers = files.find(f => f.path === 'models/headers/get_status_headers.f.dart');
+      expect(headers!.content).toContain('GetSxModeEnum? xMode,');
+      expect(headers!.content).toContain("import '../get_sx_mode_enum.f.dart';");
+
+      const enumFile = files.find(f => f.path === 'models/get_sx_mode_enum.f.dart');
+      expect(enumFile!.content).toContain('enum GetSxModeEnum {');
+    });
+  });
+
   it('should drop a null value from a string enum', () => {
     const result = generator.generateEnum('Nullable', ['null', null], undefined, 'string');
 

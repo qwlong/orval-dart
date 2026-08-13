@@ -925,8 +925,13 @@ export class EndpointGenerator {
     const pathPart = TypeMapper.toDartClassName(pathContext);
     const paramName = TypeMapper.toDartClassName(param.name);
 
-    // Format: {Method}{PathContext}{ParamName}Enum
-    const uniqueEnumTypeName = `${methodPrefix}${pathPart}${paramName}Enum`;
+    // Format: {Method}{PathContext}{ParamName}Enum, normalised as a whole
+    // because that is what the declaration goes through. A header named
+    // `X-Flag` would otherwise leave GetRXFlagEnum here against the
+    // GetRxFlagEnum the model file declares.
+    const uniqueEnumTypeName = TypeMapper.toDartClassName(
+      `${methodPrefix}${pathPart}${paramName}Enum`
+    );
 
     // Check if this parameter has an inline enum
     // If so, return the enum type name that was generated in models.ts
