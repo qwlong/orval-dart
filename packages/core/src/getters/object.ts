@@ -25,6 +25,8 @@ export interface PropertyInfo {
   description?: string;
   defaultValue?: any;
   jsonKey?: string;
+  /** `format: date` - serializes as YYYY-MM-DD rather than a full timestamp */
+  dateOnly?: boolean;
 }
 
 /**
@@ -234,7 +236,8 @@ function processProperty(
     description: propSchema.description,
     defaultValue: propSchema.default,
     // Always add jsonKey if names differ OR if propName contains $ (for raw string handling)
-    jsonKey: (dartName !== propName || propName.includes('$')) ? propName : undefined
+    jsonKey: (dartName !== propName || propName.includes('$')) ? propName : undefined,
+    dateOnly: TypeMapper.isDateOnlySchema(propSchema)
   };
 }
 
@@ -257,7 +260,8 @@ function generateObjectModel(
     nullable: prop.nullable,
     description: prop.description,
     defaultValue: prop.defaultValue,
-    jsonKey: prop.jsonKey
+    jsonKey: prop.jsonKey,
+    dateOnly: prop.dateOnly
   }));
   
   const fileName = TypeMapper.toSnakeCase(name);
@@ -265,6 +269,7 @@ function generateObjectModel(
   
   // Check for special imports
   const hasUint8List = dartProperties.some(p => p.type.includes('Uint8List'));
+  const hasDateOnlyConverter = dartProperties.some(p => p.dateOnly);
   
   // Prepare template data - matching what ModelGenerator.renderModel does
   const templateData = {
@@ -272,6 +277,7 @@ function generateObjectModel(
     fileName,
     description: undefined,
     hasUint8List,
+    hasDateOnlyConverter,
     additionalImports: imports.filter(imp => 
       !imp.includes('dart:') && 
       !imp.includes('freezed') && 
@@ -284,6 +290,7 @@ function generateObjectModel(
       nullable: prop.nullable,
       description: prop.description,
       jsonKey: prop.jsonKey,
+      dateOnly: prop.dateOnly,
       defaultValue: formatDefaultValueForTemplate(prop.defaultValue, prop.type)
     }))
   };

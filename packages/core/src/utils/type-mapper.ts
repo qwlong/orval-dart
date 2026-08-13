@@ -37,6 +37,38 @@ export const TYPE_MAP: Record<string, string> = {
 
 export class TypeMapper {
   /**
+   * A `format: date` value is a calendar date, not a point in time. It maps to
+   * DateTime like `date-time` does, but has to serialize back as YYYY-MM-DD.
+   * Unwraps nullable unions and arrays, so `oneOf: [date, null]` and
+   * `array of date` are both recognised.
+   */
+  static isDateOnlySchema(schema: any): boolean {
+    if (!schema || typeof schema !== 'object') {
+      return false;
+    }
+
+    if (schema.format === 'date') {
+      return true;
+    }
+
+    if (schema.items) {
+      return TypeMapper.isDateOnlySchema(schema.items);
+    }
+
+    for (const key of ['oneOf', 'anyOf', 'allOf']) {
+      const branches = schema[key];
+      if (Array.isArray(branches)) {
+        const nonNull = branches.filter((b: any) => b && b.type !== 'null');
+        if (nonNull.some((b: any) => TypeMapper.isDateOnlySchema(b))) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Map OpenAPI type to Dart type
    */
   static mapType(schema: SchemaObject): string {

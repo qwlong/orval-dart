@@ -67,6 +67,7 @@ export interface QueryParameter {
   required: boolean;
   type?: string;
   description?: string;
+  format?: string;
 }
 
 export interface HeaderParameter {
@@ -410,7 +411,8 @@ export class EndpointGenerator {
             originalName: p.name,
             required: p.required || false,
             type: dartType,
-            description: p.description
+            description: p.description,
+            format: p.schema && !('$ref' in p.schema) ? p.schema.format : undefined
           });
           break;
         case 'header':

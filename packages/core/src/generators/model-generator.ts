@@ -186,6 +186,7 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
           nullable: !isRequired || propDetails.nullable === true,
           description: propDetails.description,
           defaultValue: propDetails.default,
+          dateOnly: TypeMapper.isDateOnlySchema(propDetails),
           // Always add jsonKey if names differ OR if propName contains $ (for raw string handling)
           jsonKey: (dartName !== propName || propName.includes('$')) ? propName : undefined
         });
@@ -210,8 +211,7 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
     // Check for special types
     const hasDateTime = model.properties.some(p => p.type.includes('DateTime'));
     const hasUint8List = model.properties.some(p => p.type.includes('Uint8List'));
-    // DateTime converters are not needed - Freezed/json_serializable handle DateTime automatically
-    const hasDateTimeConverter = false;
+    const hasDateOnlyConverter = model.properties.some(p => p.dateOnly);
     
     // Check if we need custom JSON serialization
     const hasCustomJson = model.properties.some(p => p.jsonKey);
@@ -231,13 +231,14 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
         nullable: prop.nullable,
         description: prop.description,
         jsonKey: prop.jsonKey,
+        dateOnly: prop.dateOnly,
         isDateTime: prop.type === 'DateTime',
         defaultValue: this.formatDefaultValue(prop),
         deprecated: false
       })),
       hasDateTime,
       hasUint8List,
-      hasDateTimeConverter,
+      hasDateOnlyConverter,
       hasCustomJson,
       hasFieldRename,
       additionalImports: model.imports.filter(imp =>

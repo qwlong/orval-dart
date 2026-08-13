@@ -151,6 +151,8 @@ export interface DartProperty {
   description?: string;
   defaultValue?: any;
   jsonKey?: string;
+  /** `format: date` - serializes as YYYY-MM-DD rather than a full timestamp */
+  dateOnly?: boolean;
 }
 
 export interface DartEndpoint {
