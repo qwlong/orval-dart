@@ -374,13 +374,25 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
     // This ensures that if the backend adds new enum values, the client won't crash
     // Numeric enums have no spare value to use as a sentinel, so fromValue
     // returns null for them instead
-    const hasUnknown = enumValues.some(v => v.name === 'unknown');
-    if (!hasUnknown && !isNumeric) {
-      enumValues.push({
-        name: 'unknown',
-        value: 'unknown',
-        description: 'Unknown value for forward compatibility'
-      });
+    //
+    // The sentinel is the member carrying the value 'unknown', which the spec
+    // may already declare. Looking it up by member name instead would miss it:
+    // de-duplication renames, so `enum: ['Unknown']` yields a member spelled
+    // `unknown` that stands for a real value, and mistaking it for the sentinel
+    // drops the fallback and decodes anything unrecognised as 'Unknown'.
+    let unknownName: string | undefined;
+    if (!isNumeric) {
+      const declared = enumValues.find(v => v.value === 'unknown');
+      if (declared) {
+        unknownName = declared.name;
+      } else {
+        unknownName = uniqueEnumMemberName('unknown', usedNames);
+        enumValues.push({
+          name: unknownName,
+          value: 'unknown',
+          description: 'Unknown value for forward compatibility'
+        });
+      }
     }
 
     const templateData = {
@@ -388,7 +400,8 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
       description,
       values: enumValues,
       // Numbers render as bare Dart literals, strings stay quoted
-      isNumeric
+      isNumeric,
+      unknownName
     };
     
     const content = this.templateManager.render('freezed-enum', templateData);

@@ -54,16 +54,16 @@ extension {{enumName}}Extension on {{enumName}} {
   }
 
   static {{enumName}} fromValue(String? value) {
-    if (value == null) return {{enumName}}.unknown;
+    if (value == null) return {{enumName}}.{{unknownName}};
     switch (value) {
 {{#each values}}
-{{#unless (eq name "unknown")}}
+{{#unless (eq name ../unknownName)}}
       case '{{value}}':
         return {{../enumName}}.{{name}};
 {{/unless}}
 {{/each}}
       default:
-        return {{enumName}}.unknown;
+        return {{enumName}}.{{unknownName}};
     }
   }
 {{/if}}

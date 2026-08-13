@@ -362,6 +362,28 @@ describe('Enum Generation', () => {
     });
   });
 
+  describe('the unknown sentinel', () => {
+    it('should not hand the sentinel over to a value that spells out unknown', () => {
+      const result = generator.generateEnum('Cased', ['Unknown'], undefined, 'string');
+
+      // 'Unknown' sanitizes to `unknown`, but it is a real value - taking it
+      // for the sentinel would decode every unrecognised value as 'Unknown'
+      expect(result.content).toContain("@JsonValue('Unknown')\n  unknown,");
+      expect(result.content).toContain("@JsonValue('unknown')\n  unknown2");
+      expect(result.content).toContain('if (value == null) return Cased.unknown2;');
+      expect(result.content).toContain('default:\n        return Cased.unknown2;');
+    });
+
+    it('should reuse a declared unknown value as the sentinel', () => {
+      const result = generator.generateEnum('Declared', ['unknown', 'active'], undefined, 'string');
+
+      expect(result.content.match(/@JsonValue\('unknown'\)/g)?.length).toBe(1);
+      // The sentinel is what the default arm returns, so it gets no case
+      expect(result.content).not.toContain("case 'unknown':");
+      expect(result.content).toContain('default:\n        return Declared.unknown;');
+    });
+  });
+
   describe('a parameter whose enum Dart cannot express', () => {
     const paramSpec = {
       openapi: '3.0.0',
