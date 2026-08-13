@@ -67,7 +67,8 @@ export interface QueryParameter {
   required: boolean;
   type?: string;
   description?: string;
-  format?: string;
+  /** `format: date` - serializes as YYYY-MM-DD rather than a full timestamp */
+  dateOnly?: boolean;
 }
 
 export interface HeaderParameter {
@@ -412,7 +413,7 @@ export class EndpointGenerator {
             required: p.required || false,
             type: dartType,
             description: p.description,
-            format: p.schema && !('$ref' in p.schema) ? p.schema.format : undefined
+            dateOnly: TypeMapper.isDateOnlySchema(p.schema)
           });
           break;
         case 'header':

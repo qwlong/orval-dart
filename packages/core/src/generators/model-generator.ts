@@ -186,7 +186,7 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
           nullable: !isRequired || propDetails.nullable === true,
           description: propDetails.description,
           defaultValue: propDetails.default,
-          dateOnly: TypeMapper.isDateOnlySchema(propDetails),
+          dateOnly: TypeMapper.isDateOnlySchema(propSchema),
           // Always add jsonKey if names differ OR if propName contains $ (for raw string handling)
           jsonKey: (dartName !== propName || propName.includes('$')) ? propName : undefined
         });

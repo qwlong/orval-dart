@@ -81,7 +81,7 @@ export class ParamsGenerator {
         required: param.required,
         description: param.description,
         jsonKey: needsJsonKey ? param.originalName : undefined,
-        dateOnly: param.format === 'date'
+        dateOnly: param.dateOnly
       };
     });
 

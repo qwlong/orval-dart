@@ -9,21 +9,7 @@ part '{{fileName}}.f.freezed.dart';
 part '{{fileName}}.f.g.dart';
 {{#if hasDateOnlyConverter}}
 
-/// Serializes `format: date` values as calendar dates. They map to DateTime
-/// like `date-time` does, but the wire format is YYYY-MM-DD, and the default
-/// DateTime encoding would send a full timestamp.
-class _DateOnlyConverter implements JsonConverter<DateTime, String> {
-  const _DateOnlyConverter();
-
-  @override
-  DateTime fromJson(String json) => DateTime.parse(json);
-
-  @override
-  String toJson(DateTime date) =>
-      '${date.year.toString().padLeft(4, '0')}-'
-      '${date.month.toString().padLeft(2, '0')}-'
-      '${date.day.toString().padLeft(2, '0')}';
-}
+{{> dateOnlyConverter}}
 {{/if}}
 
 {{#if description}}

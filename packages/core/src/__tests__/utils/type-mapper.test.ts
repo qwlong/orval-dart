@@ -309,4 +309,35 @@ describe('TypeMapper', () => {
       expect(TypeMapper.isDartReservedKeyword('className')).toBe(false);
     });
   });
+
+  describe('isDateOnlySchema', () => {
+    it('should recognise a date schema and the wrappers around one', () => {
+      expect(TypeMapper.isDateOnlySchema({ type: 'string', format: 'date' })).toBe(true);
+      expect(TypeMapper.isDateOnlySchema({
+        type: 'array',
+        items: { type: 'string', format: 'date' }
+      })).toBe(true);
+      expect(TypeMapper.isDateOnlySchema({
+        oneOf: [{ type: 'string', format: 'date' }, { type: 'null' } as any]
+      })).toBe(true);
+      expect(TypeMapper.isDateOnlySchema({
+        allOf: [{ type: 'string', format: 'date' }]
+      })).toBe(true);
+    });
+
+    it('should not recognise anything else as a calendar date', () => {
+      expect(TypeMapper.isDateOnlySchema({ type: 'string', format: 'date-time' })).toBe(false);
+      expect(TypeMapper.isDateOnlySchema({ type: 'string' })).toBe(false);
+      expect(TypeMapper.isDateOnlySchema({
+        type: 'array',
+        items: { type: 'string', format: 'date-time' }
+      })).toBe(false);
+      expect(TypeMapper.isDateOnlySchema(undefined)).toBe(false);
+    });
+
+    it('should not follow a reference', () => {
+      // A scalar component schema generates a class of its own, not a DateTime
+      expect(TypeMapper.isDateOnlySchema({ $ref: '#/components/schemas/LocalDate' })).toBe(false);
+    });
+  });
 });

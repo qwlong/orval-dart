@@ -39,11 +39,14 @@ export class TypeMapper {
   /**
    * A `format: date` value is a calendar date, not a point in time. It maps to
    * DateTime like `date-time` does, but has to serialize back as YYYY-MM-DD.
-   * Unwraps nullable unions and arrays, so `oneOf: [date, null]` and
-   * `array of date` are both recognised.
+   * Unwraps arrays and the wrappers that carry a single schema, so `array of
+   * date`, `oneOf: [date, null]` and `allOf: [date]` are all recognised.
+   *
+   * A `$ref` is not followed: a scalar component schema does not generate a
+   * DateTime field today, it generates a class of its own.
    */
-  static isDateOnlySchema(schema: any): boolean {
-    if (!schema || typeof schema !== 'object') {
+  static isDateOnlySchema(schema?: SchemaObject): boolean {
+    if (!schema || typeof schema !== 'object' || '$ref' in schema) {
       return false;
     }
 
@@ -51,21 +54,14 @@ export class TypeMapper {
       return true;
     }
 
-    if (schema.items) {
-      return TypeMapper.isDateOnlySchema(schema.items);
+    const items = (schema as OpenAPIV3.ArraySchemaObject).items;
+    if (items && TypeMapper.isDateOnlySchema(items)) {
+      return true;
     }
 
-    for (const key of ['oneOf', 'anyOf', 'allOf']) {
-      const branches = schema[key];
-      if (Array.isArray(branches)) {
-        const nonNull = branches.filter((b: any) => b && b.type !== 'null');
-        if (nonNull.some((b: any) => TypeMapper.isDateOnlySchema(b))) {
-          return true;
-        }
-      }
-    }
-
-    return false;
+    return [schema.oneOf, schema.anyOf, schema.allOf].some(
+      branches => Array.isArray(branches) && branches.some(branch => TypeMapper.isDateOnlySchema(branch))
+    );
   }
 
   /**
