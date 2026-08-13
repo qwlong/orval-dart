@@ -227,7 +227,14 @@ function processParametersForEnums(
     const uniqueEnumTypeName = `${methodPrefix}${pathPart}${paramName}Enum`;
 
     // Check if this parameter has an inline enum (not a reference)
-    if (isRepresentableEnum(schema) && !('$ref' in schema)) {
+    //
+    // Every enum gets registered, representable or not. A parameter's Dart type
+    // is `{Method}{Path}{Param}Enum` by convention, decided independently in
+    // endpoint-generator, so skipping registration here would leave that name
+    // and its import pointing at a file nobody writes. Registered, it reaches
+    // the top-level branch below and comes out a typedef, the way an array of
+    // unrepresentable enum items already does.
+    if (isEnum(schema) && !('$ref' in schema)) {
       // Check if this exact enum already exists
       if (schemas[uniqueEnumTypeName]) {
         const existing = schemas[uniqueEnumTypeName];

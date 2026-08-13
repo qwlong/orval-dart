@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ModelGenerator } from '../../generators';
+import { ModelGenerator, generateDartCode } from '../../generators';
 import { generateModels } from '../../generators/models';
 
 const specWith = (schemas: Record<string, any>) => ({
@@ -359,6 +359,41 @@ describe('Enum Generation', () => {
       const file = files.find(f => f.path === 'models/day_of_week.f.dart');
       expect(file!.content).toContain('@JsonValue(1)');
       expect(file!.content).toContain('valueMinus1');
+    });
+  });
+
+  describe('a parameter whose enum Dart cannot express', () => {
+    const paramSpec = {
+      openapi: '3.0.0',
+      info: { title: 'Test API', version: '1.0.0' },
+      paths: {
+        '/r': {
+          get: {
+            operationId: 'getR',
+            parameters: [
+              { name: 'ratio', in: 'query', schema: { type: 'number', enum: [1.5, 2.5] } }
+            ],
+            responses: { '200': { description: 'ok' } }
+          }
+        }
+      },
+      components: { schemas: {} }
+    } as any;
+
+    it('should still emit the type the parameter model refers to', async () => {
+      const files = await generateDartCode({
+        input: paramSpec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
+
+      // endpoint-generator names a parameter's enum type by convention rather
+      // than from what got generated, so the file has to exist either way
+      const params = files.find(f => f.path === 'models/params/get_r_params.f.dart');
+      expect(params!.content).toContain('GetRRatioEnum? ratio,');
+      expect(params!.content).toContain("import '../get_r_ratio_enum.f.dart';");
+
+      const enumFile = files.find(f => f.path === 'models/get_r_ratio_enum.f.dart');
+      expect(enumFile!.content).toContain('typedef GetRRatioEnum = double;');
     });
   });
 
