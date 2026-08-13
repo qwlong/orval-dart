@@ -7,22 +7,12 @@ import { DartModel, DartProperty, GeneratedFile } from '../types';
 import { TypeMapper } from '../utils';
 import { ReferenceResolver } from '../resolvers';
 import { TemplateManager } from '../templates/template-manager';
-
-/**
- * Dart reserved words, which cannot be used as identifiers at all
- */
-const DART_RESERVED_WORDS = new Set([
-  'assert', 'break', 'case', 'catch', 'class', 'const', 'continue', 'default',
-  'do', 'else', 'enum', 'extends', 'false', 'final', 'finally', 'for', 'if',
-  'in', 'is', 'new', 'null', 'rethrow', 'return', 'super', 'switch', 'this',
-  'throw', 'true', 'try', 'var', 'void', 'while', 'with'
-]);
-
-/**
- * Names an enum cannot declare: `values` is generated for every enum and
- * `index` is inherited from Enum
- */
-const ENUM_MEMBER_CONFLICTS = new Set(['values', 'index']);
+import {
+  legalizeEnumMemberName,
+  numericEnumMemberName,
+  sanitizeEnumMemberName,
+  uniqueEnumMemberName
+} from '../getters/enum';
 
 export class ModelGenerator {
   private templateManager: TemplateManager;
@@ -106,6 +96,28 @@ export class ModelGenerator {
 
     const content = `// Generated typedef for empty object schema
 ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} = Map<String, dynamic>;
+`;
+
+    return {
+      path: `models/${fileName}.f.dart`,
+      content
+    };
+  }
+
+  /**
+   * Emit a typedef for an enum Dart cannot express, so `$ref`s to it still
+   * resolve and the value simply keeps its scalar type.
+   */
+  generateScalarTypedef(name: string, schema: OpenAPIV3.SchemaObject): GeneratedFile {
+    const className = TypeMapper.toDartClassName(name);
+    const fileName = TypeMapper.toSnakeCase(name);
+    // mapType answers String for anything carrying an enum, so ask about the
+    // underlying scalar instead
+    const { enum: _values, ...scalarSchema } = schema as any;
+    const dartType = TypeMapper.mapType(scalarSchema);
+
+    const content = `// Generated typedef: the enum values have no @JsonValue representation
+${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} = ${dartType};
 `;
 
     return {
@@ -301,77 +313,6 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
   }
 
   /**
-   * Build a Dart enum member name for a numeric value.
-   *
-   * `String(value)` is canonical for JS numbers, so distinct values keep
-   * distinct names. The sign and the decimal point have to survive sanitizing:
-   * stripped, `1.5` lands on integer `15` and `-1` loses its sign.
-   */
-  private numericEnumMemberName(value: number): string {
-    const encoded = String(value)
-      .replace(/-/g, 'Minus')
-      .replace(/\./g, 'Point')
-      .replace(/\+/g, 'Plus');
-
-    return `value${encoded.charAt(0).toUpperCase()}${encoded.slice(1)}`;
-  }
-
-  /**
-   * Reduce an arbitrary string value to a camelCase Dart identifier.
-   * The result can still be empty or otherwise illegal - legalize it after.
-   */
-  private sanitizeEnumMemberName(value: string): string {
-    const sanitized = value
-      .replace(/[^a-zA-Z0-9_]/g, '_')  // Replace non-alphanumeric with underscore
-      .replace(/_+/g, '_')              // Replace multiple underscores with single
-      .replace(/^_+|_+$/g, '');         // Remove leading/trailing underscores
-
-    const parts = sanitized.split('_');
-    const camelCased = parts[0].toLowerCase() + parts.slice(1).map(p =>
-      p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()
-    ).join('');
-
-    // Ensure it doesn't start with uppercase
-    return camelCased.charAt(0).match(/[A-Z]/)
-      ? camelCased.charAt(0).toLowerCase() + camelCased.slice(1)
-      : camelCased;
-  }
-
-  /**
-   * Turn a name Dart would reject into one it accepts. Sanitizing can empty a
-   * name out entirely, leave it starting with a digit, or land it on a keyword
-   * or on a member every enum already declares.
-   */
-  private legalizeEnumMemberName(name: string): string {
-    const needsPrefix =
-      name === '' ||
-      /^\d/.test(name) ||
-      DART_RESERVED_WORDS.has(name) ||
-      ENUM_MEMBER_CONFLICTS.has(name);
-
-    return needsPrefix
-      ? `value${name.charAt(0).toUpperCase()}${name.slice(1)}`
-      : name;
-  }
-
-  /**
-   * Distinct enum values can still reduce to the same legal identifier -
-   * `1.5` and `15`, `'Active'` and `'active'`, anything differing only in
-   * characters sanitizing drops. Suffix the later ones so the enum compiles.
-   */
-  private uniqueEnumMemberName(name: string, usedNames: Set<string>): string {
-    let unique = name;
-    let suffix = 2;
-    while (usedNames.has(unique)) {
-      unique = `${name}${suffix}`;
-      suffix++;
-    }
-
-    usedNames.add(unique);
-    return unique;
-  }
-
-  /**
    * Generate enum from schema
    */
   generateEnum(
@@ -393,13 +334,6 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
       nonNullValues.length > 0 &&
       nonNullValues.every(value => typeof value === 'number');
     
-    // A boolean enum has the same problem numeric ones had: quoting the values
-    // sends "true" where the server expects true
-    const isBoolean =
-      (type === undefined || type === 'boolean') &&
-      nonNullValues.length > 0 &&
-      nonNullValues.every(value => typeof value === 'boolean');
-
     // A null enum value gets no member. json_serializable decodes a null
     // source to Dart null without consulting the value map, so the member
     // would be unreachable through fromJson.
@@ -424,13 +358,13 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
         } else if (value === 'null') {
           baseName = 'nullValue';
         } else if (typeof value === 'number') {
-          baseName = this.numericEnumMemberName(value);
+          baseName = numericEnumMemberName(value);
         } else {
-          baseName = this.sanitizeEnumMemberName(String(value));
+          baseName = sanitizeEnumMemberName(String(value));
         }
 
         return {
-          name: this.uniqueEnumMemberName(this.legalizeEnumMemberName(baseName), usedNames),
+          name: uniqueEnumMemberName(legalizeEnumMemberName(baseName), usedNames),
           value,
           description: value === '' ? 'Empty string' : undefined
         };
@@ -438,10 +372,10 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
 
     // Add 'unknown' fallback value for forward compatibility
     // This ensures that if the backend adds new enum values, the client won't crash
-    // Numeric and boolean enums have no spare value to use as a sentinel, so
-    // fromValue returns null for them instead
+    // Numeric enums have no spare value to use as a sentinel, so fromValue
+    // returns null for them instead
     const hasUnknown = enumValues.some(v => v.name === 'unknown');
-    if (!hasUnknown && !isNumeric && !isBoolean) {
+    if (!hasUnknown && !isNumeric) {
       enumValues.push({
         name: 'unknown',
         value: 'unknown',
@@ -453,12 +387,8 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
       enumName,
       description,
       values: enumValues,
-      // Numbers and booleans render as bare Dart literals, strings stay quoted
-      isLiteral: isNumeric || isBoolean,
-      valueType: isBoolean ? 'bool' : 'num',
-      // A switch over bool covers every case, so a default clause would be
-      // flagged as unreachable
-      isBoolean
+      // Numbers render as bare Dart literals, strings stay quoted
+      isNumeric
     };
     
     const content = this.templateManager.render('freezed-enum', templateData);

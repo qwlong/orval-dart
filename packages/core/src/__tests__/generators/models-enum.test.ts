@@ -1,5 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import { ModelGenerator } from '../../generators';
+import { generateModels } from '../../generators/models';
+
+const specWith = (schemas: Record<string, any>) => ({
+  openapi: '3.0.0',
+  info: { title: 'Test API', version: '1.0.0' },
+  paths: {},
+  components: { schemas }
+}) as any;
+
+const booleanSpec = specWith({ Toggle: { type: 'boolean', enum: [true, false] } });
+const decimalSpec = specWith({ Scale: { type: 'number', enum: [1.5, 2.5] } });
+const integerSpec = specWith({ DayOfWeek: { type: 'integer', enum: [-1, 1, 2] } });
+const inlineBooleanSpec = specWith({
+  Holder: { type: 'object', properties: { flag: { type: 'boolean', enum: [true, false] } } }
+});
 
 describe('Enum Generation', () => {
   const generator = new ModelGenerator();
@@ -203,16 +218,18 @@ describe('Enum Generation', () => {
       const result = generator.generateEnum('Scale', [-1, -2.5, 1.5, 15], undefined, 'number');
 
       // Sanitizing used to drop both, leaving -1 named '1' and landing 1.5 on 15
-      expect(result.content).toContain('valueMinus1');
-      expect(result.content).toContain('valueMinus2Point5');
-      expect(result.content).toContain('value1Point5');
-      expect(result.content).toContain('value15');
+        // Separators matter here - a bare toContain('value15') is also satisfied
+      // by value150
+      expect(result.content).toContain('  valueMinus1,');
+      expect(result.content).toContain('  valueMinus2Point5,');
+      expect(result.content).toContain('  value1Point5,');
+      expect(result.content).toContain('  value15\n');
     });
 
     it('should keep exponent notation legal', () => {
       const result = generator.generateEnum('Big', [1e21], undefined, 'number');
 
-      expect(result.content).toContain('value1ePlus21');
+      expect(result.content).toContain('  value1ePlus21\n');
     });
 
     it('should prefix Dart reserved words', () => {
@@ -275,29 +292,73 @@ describe('Enum Generation', () => {
     });
   });
 
-  describe('boolean enums', () => {
-    it('should serialize boolean values as literals', () => {
-      const result = generator.generateEnum('Toggle', [true, false], undefined, 'boolean');
+  describe('values Dart cannot express', () => {
+    it('should not generate a Dart enum for a single boolean value', async () => {
+      // A one-value boolean enum is a common constant marker in specs
+      const spec = specWith({ Flag: { type: 'boolean', enum: [true] } });
+      const files = await generateModels(spec, {
+        input: spec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
 
-      expect(result.content).toContain('@JsonValue(true)');
-      expect(result.content).toContain('@JsonValue(false)');
-      expect(result.content).not.toContain("@JsonValue('true')");
-
-      // true and false are keywords, so the members need prefixing
-      expect(result.content).toContain('valueTrue');
-      expect(result.content).toContain('valueFalse');
+      expect(files.find(f => f.path === 'models/flag.f.dart')!.content).toContain('typedef Flag = bool;');
     });
 
-    it('should expose boolean enums through a bool-based extension', () => {
-      const result = generator.generateEnum('Toggle', [true, false], undefined, 'boolean');
+    it('should not generate a Dart enum for mixed value types', async () => {
+      // Both members would render as @JsonValue('1'), which is ambiguous
+      const spec = specWith({ Mixed: { type: 'string', enum: [1, '1'] } });
+      const files = await generateModels(spec, {
+        input: spec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
 
-      expect(result.content).toContain('bool get value');
-      expect(result.content).toContain('static Toggle? fromValue(bool? value)');
+      expect(files.find(f => f.path === 'models/mixed.f.dart')!.content).toContain('typedef Mixed = String;');
+    });
 
-      // A switch over bool covers every case; a default clause would be
-      // reported as unreachable
-      expect(result.content).not.toContain('default:');
-      expect(result.content).not.toContain('unknown');
+    it('should not generate a Dart enum for booleans', async () => {
+      // json_serializable only accepts String, int or null in a @JsonValue,
+      // so `@JsonValue(true)` fails the build
+      const files = await generateModels(booleanSpec, {
+        input: booleanSpec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
+
+      const file = files.find(f => f.path === 'models/toggle.f.dart');
+      expect(file!.content).toContain('typedef Toggle = bool;');
+      expect(file!.content).not.toContain('@JsonValue(');
+    });
+
+    it('should not generate a Dart enum for decimals', async () => {
+      const files = await generateModels(decimalSpec, {
+        input: decimalSpec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
+
+      const file = files.find(f => f.path === 'models/scale.f.dart');
+      expect(file!.content).toContain('typedef Scale = double;');
+      expect(file!.content).not.toContain('@JsonValue(');
+    });
+
+    it('should keep the property scalar for an inline unrepresentable enum', async () => {
+      const files = await generateModels(inlineBooleanSpec, {
+        input: inlineBooleanSpec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
+
+      const file = files.find(f => f.path === 'models/holder.f.dart');
+      expect(file!.content).toContain('bool? flag,');
+      expect(files.find(f => f.path.includes('holder_flag_enum'))).toBeUndefined();
+    });
+
+    it('should still generate integer enums', async () => {
+      const files = await generateModels(integerSpec, {
+        input: integerSpec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
+
+      const file = files.find(f => f.path === 'models/day_of_week.f.dart');
+      expect(file!.content).toContain('@JsonValue(1)');
+      expect(file!.content).toContain('valueMinus1');
     });
   });
 

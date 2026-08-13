@@ -59,6 +59,32 @@ export function isEnum(schema: any): boolean {
 }
 
 /**
+ * Whether an enum can be expressed as a Dart enum.
+ *
+ * json_serializable only accepts String, int or null in a `@JsonValue`, so a
+ * set of decimals or booleans has no representation - the file it produces
+ * cannot be built. Those schemas keep their scalar Dart type instead, and the
+ * allowed values stay a server-side constraint.
+ */
+export function isRepresentableEnum(schema: any): boolean {
+  if (!isEnum(schema)) {
+    return false;
+  }
+
+  const values = schema.enum.filter((value: any) => value !== null);
+  if (values.length === 0) {
+    return false;
+  }
+
+  const allStrings = values.every((value: any) => typeof value === 'string');
+  // Beyond the safe range the literal either loses precision or overflows
+  // Dart's int, and JS starts printing it in exponent notation
+  const allIntegers = values.every((value: any) => Number.isSafeInteger(value));
+
+  return allStrings || allIntegers;
+}
+
+/**
  * Check if schema is an object type
  */
 export function isObject(schema: any): boolean {

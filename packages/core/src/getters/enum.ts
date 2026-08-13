@@ -37,45 +37,121 @@ export function getEnumValues(schema: OpenAPIV3.SchemaObject): (string | number 
 }
 
 /**
- * Convert enum value to valid Dart identifier
+ * Dart reserved words, which cannot be used as identifiers at all
  */
-export function enumValueToDartName(value: string | number | null): string {
-  // Handle null values
-  if (value === null || value === 'null') {
-    return 'nullValue';
-  }
-  
-  // Handle empty string
-  if (value === '') {
-    return 'empty';
-  }
-  
-  // Start with the original value
-  let dartName = String(value);
-  
-  // Handle numeric-only values or values starting with numbers
-  if (/^\d/.test(dartName)) {
-    dartName = `value${dartName.charAt(0).toUpperCase() + dartName.slice(1)}`;
-  }
-  
-  // Replace special characters with underscores
-  dartName = dartName
+const DART_RESERVED_WORDS = new Set([
+  'assert', 'break', 'case', 'catch', 'class', 'const', 'continue', 'default',
+  'do', 'else', 'enum', 'extends', 'false', 'final', 'finally', 'for', 'if',
+  'in', 'is', 'new', 'null', 'rethrow', 'return', 'super', 'switch', 'this',
+  'throw', 'true', 'try', 'var', 'void', 'while', 'with'
+]);
+
+/**
+ * Names an enum cannot declare: `values` is generated for every enum, `index`
+ * comes from Enum, and the rest are inherited from Object. Declaring any of
+ * them is a conflicting_static_and_instance error. `name` and `compareTo` are
+ * fine - those come from an extension and from Comparable.
+ */
+const ENUM_MEMBER_CONFLICTS = new Set([
+  'values', 'index', 'hashCode', 'runtimeType', 'toString', 'noSuchMethod'
+]);
+
+/**
+ * Build a Dart enum member name for a numeric value.
+ *
+ * `String(value)` is canonical for JS numbers, so distinct values keep
+ * distinct names. The sign and the decimal point have to survive sanitizing:
+ * stripped, `1.5` lands on integer `15` and `-1` loses its sign.
+ */
+export function numericEnumMemberName(value: number): string {
+  const encoded = String(value)
+    .replace(/-/g, 'Minus')
+    .replace(/\./g, 'Point')
+    .replace(/\+/g, 'Plus');
+
+  return `value${encoded.charAt(0).toUpperCase()}${encoded.slice(1)}`;
+}
+
+/**
+ * Reduce an arbitrary string value to a camelCase Dart identifier.
+ * The result can still be empty or otherwise illegal - legalize it after.
+ */
+export function sanitizeEnumMemberName(value: string): string {
+  const sanitized = value
     .replace(/[^a-zA-Z0-9_]/g, '_')  // Replace non-alphanumeric with underscore
     .replace(/_+/g, '_')              // Replace multiple underscores with single
     .replace(/^_+|_+$/g, '');         // Remove leading/trailing underscores
-  
-  // Convert to camelCase for Dart enum convention
-  const parts = dartName.split('_');
-  dartName = parts[0].toLowerCase() + parts.slice(1).map(p => 
+
+  const parts = sanitized.split('_');
+  const camelCased = parts[0].toLowerCase() + parts.slice(1).map(p =>
     p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()
   ).join('');
-  
+
   // Ensure it doesn't start with uppercase
-  if (dartName.charAt(0).match(/[A-Z]/)) {
-    dartName = dartName.charAt(0).toLowerCase() + dartName.slice(1);
+  return camelCased.charAt(0).match(/[A-Z]/)
+    ? camelCased.charAt(0).toLowerCase() + camelCased.slice(1)
+    : camelCased;
+}
+
+/**
+ * Turn a name Dart would reject into one it accepts. Sanitizing can empty a
+ * name out entirely, leave it starting with a digit, or land it on a keyword
+ * or on a member every enum already declares.
+ */
+export function legalizeEnumMemberName(name: string): string {
+  const needsPrefix =
+    name === '' ||
+    /^\d/.test(name) ||
+    DART_RESERVED_WORDS.has(name) ||
+    ENUM_MEMBER_CONFLICTS.has(name);
+
+  return needsPrefix
+    ? `value${name.charAt(0).toUpperCase()}${name.slice(1)}`
+    : name;
+}
+
+/**
+ * Distinct enum values can still reduce to the same legal identifier -
+ * `'Active'` and `'active'`, anything differing only in characters sanitizing
+ * drops. Suffix the later ones so the enum compiles.
+ *
+ * Which value keeps the unsuffixed name follows the order they appear in the
+ * spec, so reordering them renames members. Unavoidable without inventing
+ * names from the values themselves, but worth knowing before reshuffling an
+ * enum.
+ */
+export function uniqueEnumMemberName(name: string, usedNames: Set<string>): string {
+  let unique = name;
+  let suffix = 2;
+  while (usedNames.has(unique)) {
+    unique = `${name}${suffix}`;
+    suffix++;
   }
-  
-  return dartName;
+
+  usedNames.add(unique);
+  return unique;
+}
+
+/**
+ * Convert enum value to valid Dart identifier.
+ *
+ * Names are not guaranteed unique on their own - run the result through
+ * uniqueEnumMemberName when building a whole enum.
+ */
+export function enumValueToDartName(value: string | number | null): string {
+  if (value === null || value === 'null') {
+    return 'nullValue';
+  }
+
+  if (value === '') {
+    return 'empty';
+  }
+
+  const baseName = typeof value === 'number'
+    ? numericEnumMemberName(value)
+    : sanitizeEnumMemberName(String(value));
+
+  return legalizeEnumMemberName(baseName);
 }
 
 /**
