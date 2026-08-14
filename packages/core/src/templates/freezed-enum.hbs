@@ -13,11 +13,39 @@ enum {{enumName}} {
 {{else}}
   @JsonValue('{{dartString value}}')
 {{/if}}
-  {{name}}{{#unless @last}},{{/unless}}
+  {{name}}{{#if @last}};{{else}},{{/if}}
 {{#unless @last}}
 
 {{/unless}}
 {{/each}}
+
+{{#if isNumeric}}
+  static {{enumName}}? fromValue(num? value) {
+    if (value == null) return null;
+    switch (value) {
+{{#each values}}
+      case {{value}}:
+        return {{../enumName}}.{{name}};
+{{/each}}
+      default:
+        return null;
+    }
+  }
+{{else}}
+  static {{enumName}} fromValue(String? value) {
+    if (value == null) return {{enumName}}.{{unknownName}};
+    switch (value) {
+{{#each values}}
+{{#unless (eq name ../unknownName)}}
+      case '{{dartString value}}':
+        return {{../enumName}}.{{name}};
+{{/unless}}
+{{/each}}
+      default:
+        return {{enumName}}.{{unknownName}};
+    }
+  }
+{{/if}}
 }
 
 /// Extension methods for {{enumName}}
@@ -32,17 +60,8 @@ extension {{enumName}}Extension on {{enumName}} {
     }
   }
 
-  static {{enumName}}? fromValue(num? value) {
-    if (value == null) return null;
-    switch (value) {
-{{#each values}}
-      case {{value}}:
-        return {{../enumName}}.{{name}};
-{{/each}}
-      default:
-        return null;
-    }
-  }
+  /// Only reachable as {{enumName}}Extension.fromValue - prefer {{enumName}}.fromValue
+  static {{enumName}}? fromValue(num? value) => {{enumName}}.fromValue(value);
 {{else}}
   String get value {
     switch (this) {
@@ -53,18 +72,7 @@ extension {{enumName}}Extension on {{enumName}} {
     }
   }
 
-  static {{enumName}} fromValue(String? value) {
-    if (value == null) return {{enumName}}.{{unknownName}};
-    switch (value) {
-{{#each values}}
-{{#unless (eq name ../unknownName)}}
-      case '{{dartString value}}':
-        return {{../enumName}}.{{name}};
-{{/unless}}
-{{/each}}
-      default:
-        return {{enumName}}.{{unknownName}};
-    }
-  }
+  /// Only reachable as {{enumName}}Extension.fromValue - prefer {{enumName}}.fromValue
+  static {{enumName}} fromValue(String? value) => {{enumName}}.fromValue(value);
 {{/if}}
 }

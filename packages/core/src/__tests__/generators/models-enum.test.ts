@@ -223,13 +223,13 @@ describe('Enum Generation', () => {
       expect(result.content).toContain('  valueMinus1,');
       expect(result.content).toContain('  valueMinus2Point5,');
       expect(result.content).toContain('  value1Point5,');
-      expect(result.content).toContain('  value15\n');
+      expect(result.content).toContain('  value15;');
     });
 
     it('should keep exponent notation legal', () => {
       const result = generator.generateEnum('Big', [1e21], undefined, 'number');
 
-      expect(result.content).toContain('  value1ePlus21\n');
+      expect(result.content).toContain('  value1ePlus21;');
     });
 
     it('should prefix Dart reserved words', () => {
@@ -264,6 +264,27 @@ describe('Enum Generation', () => {
       // Both sanitize down to an empty string, which is not an identifier
       expect(result.content).toContain('@JsonValue(\'日本\')\n  value');
       expect(result.content).toContain('@JsonValue(\'-\')\n  value2');
+    });
+  });
+
+  describe('where fromValue lives', () => {
+    const enumBodyOf = (content: string, name: string) =>
+      content.slice(content.indexOf(`enum ${name} {`), content.indexOf(`extension ${name}Extension`));
+
+    it('should declare fromValue on the enum itself', () => {
+      const result = generator.generateEnum('Reach', ['a'], undefined, 'string');
+
+      // A static on the extension is only reachable as ReachExtension.fromValue -
+      // Reach.fromValue, which is what a caller writes, does not resolve to it
+      expect(enumBodyOf(result.content, 'Reach')).toContain('static Reach fromValue(String? value)');
+      // and the old spelling keeps working
+      expect(result.content).toContain('static Reach fromValue(String? value) => Reach.fromValue(value);');
+    });
+
+    it('should declare fromValue on a numeric enum too', () => {
+      const result = generator.generateEnum('Code', [1, 2], undefined, 'integer');
+
+      expect(enumBodyOf(result.content, 'Code')).toContain('static Code? fromValue(num? value)');
     });
   });
 
