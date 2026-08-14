@@ -5,6 +5,7 @@
 import type { OpenAPIV3 } from 'openapi-types';
 import { TypeMapper } from '../utils';
 import { ReferenceResolver } from '../resolvers';
+import { isEnum, scalarTypeOfEnumSchema } from '../getters/enum';
 
 export interface EndpointMethod {
   methodName: string;
@@ -785,7 +786,12 @@ export class EndpointGenerator {
       };
     }
 
-    const dartType = TypeMapper.mapType(schemaObj);
+    // An enum response keeps the type its values have. mapType answers String
+    // for anything carrying an enum, so a `type: number` enum came back as a
+    // String the generated cast then threw on.
+    const dartType = isEnum(schemaObj)
+      ? scalarTypeOfEnumSchema(schemaObj, TypeMapper.mapType.bind(TypeMapper))
+      : TypeMapper.mapType(schemaObj);
     const type = isNullable ? `${dartType}?` : dartType;
 
     // Check if it's a primitive

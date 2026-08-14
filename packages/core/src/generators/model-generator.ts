@@ -7,29 +7,7 @@ import { DartModel, DartProperty, GeneratedFile } from '../types';
 import { TypeMapper } from '../utils';
 import { ReferenceResolver } from '../resolvers';
 import { TemplateManager } from '../templates/template-manager';
-import { buildEnumMembers, uniqueEnumMemberName } from '../getters/enum';
-
-const SCALAR_BY_VALUE_TYPE: Record<string, string> = {
-  boolean: 'bool',
-  // An integer set Dart can express never reaches the typedef path, so a number
-  // left here is a decimal or outside int range
-  number: 'double',
-  string: 'String'
-};
-
-/**
- * Dart type for a set of enum values, for schemas that declare no type.
- */
-function scalarTypeOfValues(values: unknown[]): string {
-  const valueTypes = new Set((values ?? []).filter(value => value !== null).map(value => typeof value));
-
-  if (valueTypes.size !== 1) {
-    return 'dynamic';
-  }
-
-  const [valueType] = valueTypes;
-  return SCALAR_BY_VALUE_TYPE[valueType] ?? 'dynamic';
-}
+import { buildEnumMembers, scalarTypeOfEnumSchema, uniqueEnumMemberName } from '../getters/enum';
 
 export class ModelGenerator {
   private templateManager: TemplateManager;
@@ -128,13 +106,7 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
   generateScalarTypedef(name: string, schema: OpenAPIV3.SchemaObject): GeneratedFile {
     const className = TypeMapper.toDartClassName(name);
     const fileName = TypeMapper.toSnakeCase(name);
-    // mapType answers String for anything carrying an enum, so ask about the
-    // underlying scalar instead. A spec is free to leave the type out, and then
-    // the values are all there is to go on.
-    const { enum: values, ...scalarSchema } = schema as any;
-    const dartType = scalarSchema.type
-      ? TypeMapper.mapType(scalarSchema)
-      : scalarTypeOfValues(values as unknown[]);
+    const dartType = scalarTypeOfEnumSchema(schema, TypeMapper.mapType.bind(TypeMapper));
 
     const content = `// Generated typedef: the enum values have no @JsonValue representation
 ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} = ${dartType};

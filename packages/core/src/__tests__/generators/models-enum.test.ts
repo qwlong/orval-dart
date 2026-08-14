@@ -475,6 +475,42 @@ describe('Enum Generation', () => {
     });
   });
 
+  describe('an enum as a response type', () => {
+    const jsonResponse = (ref: string) => ({
+      description: 'ok',
+      content: { 'application/json': { schema: { $ref: ref } } }
+    });
+    const responseSpec = {
+      openapi: '3.0.0',
+      info: { title: 'Test API', version: '1.0.0' },
+      paths: {
+        '/ratio': { get: { operationId: 'getRatio', responses: { '200': jsonResponse('#/components/schemas/RatioScale') } } },
+        '/flag': { get: { operationId: 'getFlag', responses: { '200': jsonResponse('#/components/schemas/Bools') } } }
+      },
+      components: {
+        schemas: {
+          RatioScale: { type: 'number', enum: [1.5, 2.5] },
+          Bools: { type: 'boolean', enum: [true, false] }
+        }
+      }
+    } as any;
+
+    it('should keep the type the values have', async () => {
+      const files = await generateDartCode({
+        input: responseSpec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
+
+      // Calling a decimal enum a String made the cast throw at runtime
+      const service = files.find(f => f.path === 'services/default_service.dart');
+      expect(service!.content).toContain('Future<double> getRatio(');
+      expect(service!.content).toContain('return response.data as double;');
+      expect(service!.content).toContain('Future<bool> getFlag(');
+      expect(service!.content).toContain('return response.data as bool;');
+      expect(service!.content).not.toContain('as String;');
+    });
+  });
+
   describe('a header parameter with an enum', () => {
     const headerSpec = {
       openapi: '3.0.0',

@@ -154,6 +154,43 @@ export function enumValueToDartName(value: string | number | boolean | null): st
   return legalizeEnumMemberName(baseName);
 }
 
+const SCALAR_BY_VALUE_TYPE: Record<string, string> = {
+  boolean: 'bool',
+  // An integer set Dart can express never reaches the typedef path, so a number
+  // left here is a decimal or outside int range
+  number: 'double',
+  string: 'String'
+};
+
+/**
+ * Dart type for a set of enum values, for schemas that declare no type.
+ */
+export function scalarTypeOfEnumValues(values: unknown[]): string {
+  const valueTypes = new Set((values ?? []).filter(value => value !== null).map(value => typeof value));
+
+  if (valueTypes.size !== 1) {
+    return 'dynamic';
+  }
+
+  const [valueType] = valueTypes;
+  return SCALAR_BY_VALUE_TYPE[valueType] ?? 'dynamic';
+}
+
+/**
+ * Dart type an enum schema carries underneath its values.
+ *
+ * TypeMapper.mapType answers String for anything carrying an enum, so the enum
+ * has to come off before asking. A `type: number` enum is a double, and calling
+ * it a String makes the generated cast throw at runtime.
+ */
+export function scalarTypeOfEnumSchema(schema: OpenAPIV3.SchemaObject, mapType: (s: OpenAPIV3.SchemaObject) => string): string {
+  const { enum: values, ...scalarSchema } = schema as any;
+
+  return scalarSchema.type
+    ? mapType(scalarSchema as OpenAPIV3.SchemaObject)
+    : scalarTypeOfEnumValues(values as unknown[]);
+}
+
 /**
  * Build the member list for an enum: one member per distinct value, each named
  * legally and uniquely within the enum.
