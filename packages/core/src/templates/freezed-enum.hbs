@@ -11,7 +11,7 @@ enum {{enumName}} {
 {{#if ../isNumeric}}
   @JsonValue({{value}})
 {{else}}
-  @JsonValue('{{value}}')
+  @JsonValue('{{dartString value}}')
 {{/if}}
   {{name}}{{#unless @last}},{{/unless}}
 {{#unless @last}}
@@ -48,7 +48,7 @@ extension {{enumName}}Extension on {{enumName}} {
     switch (this) {
 {{#each values}}
       case {{../enumName}}.{{name}}:
-        return '{{value}}';
+        return '{{dartString value}}';
 {{/each}}
     }
   }
@@ -58,7 +58,7 @@ extension {{enumName}}Extension on {{enumName}} {
     switch (value) {
 {{#each values}}
 {{#unless (eq name ../unknownName)}}
-      case '{{value}}':
+      case '{{dartString value}}':
         return {{../enumName}}.{{name}};
 {{/unless}}
 {{/each}}

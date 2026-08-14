@@ -79,6 +79,25 @@ export class TemplateManager {
         .replace(/&amp;/g, '&');
     });
 
+    // Helper to put a value inside a single-quoted Dart string literal.
+    //
+    // Templates are compiled with escaping on, so an interpolated value would
+    // otherwise arrive HTML-escaped - `a=b` as `a&#x3D;b`, silently changing
+    // what goes over the wire. Dart's own escaping still has to happen here:
+    // `$` starts an interpolation and a bare `'` closes the literal, either of
+    // which stops the generated file from compiling.
+    this.handlebars.registerHelper('dartString', (value: unknown) => {
+      const escaped = String(value ?? '')
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/\$/g, '\\$')
+        .replace(/\r/g, '\\r')
+        .replace(/\n/g, '\\n')
+        .replace(/\t/g, '\\t');
+
+      return new this.handlebars.SafeString(escaped);
+    });
+
     // Helper to format Dart documentation comments
     this.handlebars.registerHelper('dartDoc', (text: string, options?: any) => {
       if (!text) return '';

@@ -267,6 +267,30 @@ describe('Enum Generation', () => {
     });
   });
 
+  describe('values Dart or Handlebars would rewrite', () => {
+    it('should escape what Dart reads as syntax', () => {
+      const result = generator.generateEnum('Tricky', ["it's", '$foo', 'C:\\path'], undefined, 'string');
+
+      // A bare quote closes the literal and `$` starts an interpolation
+      expect(result.content).toContain("@JsonValue('it\\'s')");
+      expect(result.content).toContain("@JsonValue('\\$foo')");
+      expect(result.content).toContain("@JsonValue('C:\\\\path')");
+    });
+
+    it('should keep values Handlebars would HTML-escape intact', () => {
+      const result = generator.generateEnum('Web', ['a=b', 'a&b', 'x>y'], undefined, 'string');
+
+      // Escaping is on for templates, and `a&#x3D;b` compiles fine while
+      // sending the wrong thing over the wire
+      expect(result.content).toContain("@JsonValue('a=b')");
+      expect(result.content).toContain("@JsonValue('a&b')");
+      expect(result.content).toContain("@JsonValue('x>y')");
+      expect(result.content).not.toContain('&#x3D;');
+      expect(result.content).not.toContain('&amp;');
+      expect(result.content).not.toContain('&gt;');
+    });
+  });
+
   describe('colliding member names', () => {
     it('should suffix values that differ only in case', () => {
       const result = generator.generateEnum('Status', ['Active', 'active'], undefined, 'string');
