@@ -1,3 +1,12 @@
+## [0.10.5](https://github.com/qwlong/dorval/compare/v0.10.4...v0.10.5) (2026-08-17)
+
+
+### Bug Fixes
+
+* **core:** apply the date-only converter to every date query parameter ([26a6c9c](https://github.com/qwlong/dorval/commit/26a6c9c86ea5c972651a0832def5ec7223e5bd41))
+* **core:** serialize date headers as calendar dates too ([8db5f21](https://github.com/qwlong/dorval/commit/8db5f2151dff03445d73c36c06ebe2c840115a29))
+* **core:** serialize format: date as a calendar date ([a90d903](https://github.com/qwlong/dorval/commit/a90d9034bf9b74c6ad1f4e65006591e40e658927))
+
 ## [0.10.4](https://github.com/qwlong/dorval/compare/v0.10.3...v0.10.4) (2026-08-17)
 
 
