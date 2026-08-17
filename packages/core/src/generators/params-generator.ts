@@ -14,6 +14,7 @@ export interface ParameterModel {
   properties: ParameterProperty[];
   imports?: string[];
   hasComplexNestedQueryParams?: boolean;
+  hasDateOnlyConverter?: boolean;
 }
 
 export interface ParameterProperty {
@@ -22,6 +23,7 @@ export interface ParameterProperty {
   required: boolean;
   description?: string;
   jsonKey?: string; // Original name if different from dart name
+  dateOnly?: boolean; // `format: date` - serializes as YYYY-MM-DD
 }
 
 export class ParamsGenerator {
@@ -78,7 +80,8 @@ export class ParamsGenerator {
         type: paramType,
         required: param.required,
         description: param.description,
-        jsonKey: needsJsonKey ? param.originalName : undefined
+        jsonKey: needsJsonKey ? param.originalName : undefined,
+        dateOnly: param.dateOnly
       };
     });
 
@@ -113,7 +116,8 @@ export class ParamsGenerator {
       description: `Query parameters for ${methodName}`,
       properties,
       imports: Array.from(imports),
-      hasComplexNestedQueryParams
+      hasComplexNestedQueryParams,
+      hasDateOnlyConverter: properties.some(prop => prop.dateOnly)
     };
 
     const content = this.renderParamsModel(model);
@@ -160,7 +164,8 @@ export class ParamsGenerator {
         type: headerType,
         required: header.required,
         description: header.description,
-        jsonKey: header.dartName !== header.originalName ? header.originalName : undefined
+        jsonKey: header.dartName !== header.originalName ? header.originalName : undefined,
+        dateOnly: header.dateOnly
       };
     });
 
@@ -169,7 +174,8 @@ export class ParamsGenerator {
       fileName,
       description: `Headers for ${methodName}`,
       properties,
-      imports: Array.from(imports)
+      imports: Array.from(imports),
+      hasDateOnlyConverter: properties.some(prop => prop.dateOnly)
     };
 
     const content = this.renderHeadersModel(model);

@@ -23,6 +23,25 @@ if (typeof import.meta !== 'undefined' && import.meta.url) {
   dirName = path.join(process.cwd(), 'dorval/packages/core/dist');
 }
 
+/**
+ * Locate a template file, which sits next to the compiled output in dist
+ */
+function resolveTemplatePath(templateName: string): string {
+  const inTemplatesDir = path.join(dirName, 'templates', `${templateName}.hbs`);
+  return fsSync.existsSync(inTemplatesDir)
+    ? inTemplatesDir
+    : path.join(dirName, `${templateName}.hbs`);
+}
+
+/**
+ * Templates included by more than one other template, by partial name
+ */
+const FILE_PARTIALS: Record<string, string> = {
+  dateOnlyConverter: 'date-only-converter'
+};
+
+const partialSources: Map<string, string> = new Map();
+
 export class TemplateManager {
   private templates: Map<string, HandlebarsTemplateDelegate> = new Map();
   private handlebars: typeof Handlebars;
@@ -30,6 +49,22 @@ export class TemplateManager {
   constructor() {
     this.handlebars = Handlebars.create();
     this.registerHelpers();
+    this.registerFilePartials();
+  }
+
+  /**
+   * Load the shared partials from disk. Sources are cached across instances -
+   * a TemplateManager is created per model, and these never change.
+   */
+  private registerFilePartials(): void {
+    for (const [partialName, templateName] of Object.entries(FILE_PARTIALS)) {
+      let source = partialSources.get(templateName);
+      if (source === undefined) {
+        source = fsSync.readFileSync(resolveTemplatePath(templateName), 'utf-8');
+        partialSources.set(templateName, source);
+      }
+      this.handlebars.registerPartial(partialName, source);
+    }
   }
 
   /**
@@ -195,12 +230,7 @@ export class TemplateManager {
       return this.templates.get(templateName)!;
     }
 
-    // Load template file - check both templates dir and direct path
-    let templatePath = path.join(dirName, 'templates', `${templateName}.hbs`);
-    if (!fsSync.existsSync(templatePath)) {
-      templatePath = path.join(dirName, `${templateName}.hbs`);
-    }
-    const templateContent = await fs.readFile(templatePath, 'utf-8');
+    const templateContent = await fs.readFile(resolveTemplatePath(templateName), 'utf-8');
 
     // Compile template
     const compiled = this.handlebars.compile(templateContent, {
@@ -223,12 +253,7 @@ export class TemplateManager {
       return this.templates.get(templateName)!;
     }
 
-    // Load template file - check both templates dir and direct path
-    let templatePath = path.join(dirName, 'templates', `${templateName}.hbs`);
-    if (!fsSync.existsSync(templatePath)) {
-      templatePath = path.join(dirName, `${templateName}.hbs`);
-    }
-    const templateContent = fsSync.readFileSync(templatePath, 'utf-8');
+    const templateContent = fsSync.readFileSync(resolveTemplatePath(templateName), 'utf-8');
 
     // Compile template
     const compiled = this.handlebars.compile(templateContent, {

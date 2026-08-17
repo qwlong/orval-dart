@@ -37,6 +37,34 @@ export const TYPE_MAP: Record<string, string> = {
 
 export class TypeMapper {
   /**
+   * A `format: date` value is a calendar date, not a point in time. It maps to
+   * DateTime like `date-time` does, but has to serialize back as YYYY-MM-DD.
+   * Unwraps arrays and the wrappers that carry a single schema, so `array of
+   * date`, `oneOf: [date, null]` and `allOf: [date]` are all recognised.
+   *
+   * A `$ref` is not followed: a scalar component schema does not generate a
+   * DateTime field today, it generates a class of its own.
+   */
+  static isDateOnlySchema(schema?: SchemaObject): boolean {
+    if (!schema || typeof schema !== 'object' || '$ref' in schema) {
+      return false;
+    }
+
+    if (schema.format === 'date') {
+      return true;
+    }
+
+    const items = (schema as OpenAPIV3.ArraySchemaObject).items;
+    if (items && TypeMapper.isDateOnlySchema(items)) {
+      return true;
+    }
+
+    return [schema.oneOf, schema.anyOf, schema.allOf].some(
+      branches => Array.isArray(branches) && branches.some(branch => TypeMapper.isDateOnlySchema(branch))
+    );
+  }
+
+  /**
    * Map OpenAPI type to Dart type
    */
   static mapType(schema: SchemaObject): string {
@@ -426,12 +454,6 @@ export class TypeMapper {
     // Add name annotation if different
     if (dartName !== propertyName) {
       annotations.push(`name: '${propertyName}'`);
-    }
-
-    // Add fromJson/toJson for DateTime
-    const type = this.mapType(schema);
-    if (type === 'DateTime') {
-      annotations.push('fromJson: _dateTimeFromJson, toJson: _dateTimeToJson');
     }
 
     if (annotations.length > 0) {

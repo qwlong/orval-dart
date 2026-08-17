@@ -351,7 +351,8 @@ export class HeadersGenerator {
       type: header.type || 'String',
       required: header.required,
       description: header.description,
-      jsonKey: header.dartName !== header.originalName ? header.originalName : undefined
+      jsonKey: header.dartName !== header.originalName ? header.originalName : undefined,
+      dateOnly: header.dateOnly
     }));
 
     const content = this.templateManager.render('freezed-headers-model', {
@@ -362,7 +363,8 @@ export class HeadersGenerator {
         : `Headers for ${model.className.replace(/Headers$/, '')}`,
       properties,
       hasJsonKey: properties.some(p => p.jsonKey),
-      hasDescription: properties.some(p => p.description)
+      hasDescription: properties.some(p => p.description),
+      hasDateOnlyConverter: properties.some(p => p.dateOnly)
     });
 
     return {
