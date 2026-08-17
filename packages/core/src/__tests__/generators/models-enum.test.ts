@@ -1,5 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { ModelGenerator } from '../../generators';
+import { ModelGenerator, generateDartCode } from '../../generators';
+import { generateModels } from '../../generators/models';
+
+const specWith = (schemas: Record<string, any>) => ({
+  openapi: '3.0.0',
+  info: { title: 'Test API', version: '1.0.0' },
+  paths: {},
+  components: { schemas }
+}) as any;
+
+const booleanSpec = specWith({ Toggle: { type: 'boolean', enum: [true, false] } });
+const decimalSpec = specWith({ Scale: { type: 'number', enum: [1.5, 2.5] } });
+const integerSpec = specWith({ DayOfWeek: { type: 'integer', enum: [-1, 1, 2] } });
+const inlineBooleanSpec = specWith({
+  Holder: { type: 'object', properties: { flag: { type: 'boolean', enum: [true, false] } } }
+});
 
 describe('Enum Generation', () => {
   const generator = new ModelGenerator();
@@ -196,5 +211,347 @@ describe('Enum Generation', () => {
     expect(result.content).toContain("@JsonValue('1')");
     expect(result.content).toContain("@JsonValue('two')");
     expect(result.content).toContain('String get value');
+  });
+
+  describe('member names Dart would reject', () => {
+    it('should keep the sign and the decimal point of numeric values', () => {
+      const result = generator.generateEnum('Scale', [-1, -2.5, 1.5, 15], undefined, 'number');
+
+      // Sanitizing used to drop both, leaving -1 named '1' and landing 1.5 on 15
+        // Separators matter here - a bare toContain('value15') is also satisfied
+      // by value150
+      expect(result.content).toContain('  valueMinus1,');
+      expect(result.content).toContain('  valueMinus2Point5,');
+      expect(result.content).toContain('  value1Point5,');
+      expect(result.content).toContain('  value15;');
+    });
+
+    it('should keep exponent notation legal', () => {
+      const result = generator.generateEnum('Big', [1e21], undefined, 'number');
+
+      expect(result.content).toContain('  value1ePlus21;');
+    });
+
+    it('should prefix Dart reserved words', () => {
+      const result = generator.generateEnum('Reserved', ['new', 'class', 'default'], undefined, 'string');
+
+      expect(result.content).toContain('valueNew');
+      expect(result.content).toContain('valueClass');
+      expect(result.content).toContain('valueDefault');
+      // The @JsonValue keeps the original spelling
+      expect(result.content).toContain("@JsonValue('new')");
+    });
+
+    it('should prefix names an enum already declares', () => {
+      const result = generator.generateEnum('Builtins', ['values', 'index'], undefined, 'string');
+
+      // `values` is generated for every enum, `index` comes from Enum
+      expect(result.content).toContain('valueValues');
+      expect(result.content).toContain('valueIndex');
+    });
+
+    it('should leave a member named value alone', () => {
+      const result = generator.generateEnum('Named', ['value'], undefined, 'string');
+
+      // Enum members are static and the extension getter is an instance
+      // member, so these do not collide
+      expect(result.content).toContain('@JsonValue(\'value\')\n  value');
+    });
+
+    it('should give sanitized-away values a usable name', () => {
+      const result = generator.generateEnum('Unicode', ['日本', '-'], undefined, 'string');
+
+      // Both sanitize down to an empty string, which is not an identifier
+      expect(result.content).toContain('@JsonValue(\'日本\')\n  value');
+      expect(result.content).toContain('@JsonValue(\'-\')\n  value2');
+    });
+  });
+
+  describe('where fromValue lives', () => {
+    const enumBodyOf = (content: string, name: string) =>
+      content.slice(content.indexOf(`enum ${name} {`), content.indexOf(`extension ${name}Extension`));
+
+    it('should declare fromValue on the enum itself', () => {
+      const result = generator.generateEnum('Reach', ['a'], undefined, 'string');
+
+      // A static on the extension is only reachable as ReachExtension.fromValue -
+      // Reach.fromValue, which is what a caller writes, does not resolve to it
+      expect(enumBodyOf(result.content, 'Reach')).toContain('static Reach fromValue(String? value)');
+      // and the old spelling keeps working
+      expect(result.content).toContain('static Reach fromValue(String? value) => Reach.fromValue(value);');
+    });
+
+    it('should declare fromValue on a numeric enum too', () => {
+      const result = generator.generateEnum('Code', [1, 2], undefined, 'integer');
+
+      expect(enumBodyOf(result.content, 'Code')).toContain('static Code? fromValue(num? value)');
+    });
+  });
+
+  describe('values Dart or Handlebars would rewrite', () => {
+    it('should escape what Dart reads as syntax', () => {
+      const result = generator.generateEnum('Tricky', ["it's", '$foo', 'C:\\path'], undefined, 'string');
+
+      // A bare quote closes the literal and `$` starts an interpolation
+      expect(result.content).toContain("@JsonValue('it\\'s')");
+      expect(result.content).toContain("@JsonValue('\\$foo')");
+      expect(result.content).toContain("@JsonValue('C:\\\\path')");
+    });
+
+    it('should keep values Handlebars would HTML-escape intact', () => {
+      const result = generator.generateEnum('Web', ['a=b', 'a&b', 'x>y'], undefined, 'string');
+
+      // Escaping is on for templates, and `a&#x3D;b` compiles fine while
+      // sending the wrong thing over the wire
+      expect(result.content).toContain("@JsonValue('a=b')");
+      expect(result.content).toContain("@JsonValue('a&b')");
+      expect(result.content).toContain("@JsonValue('x>y')");
+      expect(result.content).not.toContain('&#x3D;');
+      expect(result.content).not.toContain('&amp;');
+      expect(result.content).not.toContain('&gt;');
+    });
+  });
+
+  describe('colliding member names', () => {
+    it('should suffix values that differ only in case', () => {
+      const result = generator.generateEnum('Status', ['Active', 'active'], undefined, 'string');
+
+      expect(result.content).toContain('  active,');
+      expect(result.content).toContain('  active2');
+    });
+
+    it('should suffix values that differ only in separators', () => {
+      const result = generator.generateEnum('Sep', ['a-b', 'a_b'], undefined, 'string');
+
+      expect(result.content).toContain('  aB,');
+      expect(result.content).toContain('  aB2');
+    });
+
+    it('should collapse repeated values onto one member', () => {
+      const result = generator.generateEnum('Same', [1.0, 1], undefined, 'number');
+
+      // YAML parses both to the same number, and two members sharing a
+      // @JsonValue would make the generated map ambiguous
+      expect(result.content.match(/@JsonValue\(1\)/g)?.length).toBe(1);
+      expect(result.content).not.toContain('value12');
+    });
+  });
+
+  describe('values Dart cannot express', () => {
+    it('should not generate a Dart enum for a single boolean value', async () => {
+      // A one-value boolean enum is a common constant marker in specs
+      const spec = specWith({ Flag: { type: 'boolean', enum: [true] } });
+      const files = await generateModels(spec, {
+        input: spec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
+
+      expect(files.find(f => f.path === 'models/flag.f.dart')!.content).toContain('typedef Flag = bool;');
+    });
+
+    it('should not generate a Dart enum for mixed value types', async () => {
+      // Both members would render as @JsonValue('1'), which is ambiguous
+      const spec = specWith({ Mixed: { type: 'string', enum: [1, '1'] } });
+      const files = await generateModels(spec, {
+        input: spec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
+
+      expect(files.find(f => f.path === 'models/mixed.f.dart')!.content).toContain('typedef Mixed = String;');
+    });
+
+    it('should not generate a Dart enum for booleans', async () => {
+      // json_serializable only accepts String, int or null in a @JsonValue,
+      // so `@JsonValue(true)` fails the build
+      const files = await generateModels(booleanSpec, {
+        input: booleanSpec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
+
+      const file = files.find(f => f.path === 'models/toggle.f.dart');
+      expect(file!.content).toContain('typedef Toggle = bool;');
+      expect(file!.content).not.toContain('@JsonValue(');
+    });
+
+    it('should not generate a Dart enum for decimals', async () => {
+      const files = await generateModels(decimalSpec, {
+        input: decimalSpec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
+
+      const file = files.find(f => f.path === 'models/scale.f.dart');
+      expect(file!.content).toContain('typedef Scale = double;');
+      expect(file!.content).not.toContain('@JsonValue(');
+    });
+
+    it('should keep the property scalar for an inline unrepresentable enum', async () => {
+      const files = await generateModels(inlineBooleanSpec, {
+        input: inlineBooleanSpec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
+
+      const file = files.find(f => f.path === 'models/holder.f.dart');
+      expect(file!.content).toContain('bool? flag,');
+      expect(files.find(f => f.path.includes('holder_flag_enum'))).toBeUndefined();
+    });
+
+    it('should read the scalar type off the values when the schema omits it', async () => {
+      const spec = specWith({ Flag: { enum: [true, false] }, Ratio: { enum: [1.5, 2.5] } });
+      const files = await generateModels(spec, {
+        input: spec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
+
+      expect(files.find(f => f.path === 'models/flag.f.dart')!.content).toContain('typedef Flag = bool;');
+      expect(files.find(f => f.path === 'models/ratio.f.dart')!.content).toContain('typedef Ratio = double;');
+    });
+
+    it('should still generate integer enums', async () => {
+      const files = await generateModels(integerSpec, {
+        input: integerSpec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
+
+      const file = files.find(f => f.path === 'models/day_of_week.f.dart');
+      expect(file!.content).toContain('@JsonValue(1)');
+      expect(file!.content).toContain('valueMinus1');
+    });
+  });
+
+  describe('the unknown sentinel', () => {
+    it('should not hand the sentinel over to a value that spells out unknown', () => {
+      const result = generator.generateEnum('Cased', ['Unknown'], undefined, 'string');
+
+      // 'Unknown' sanitizes to `unknown`, but it is a real value - taking it
+      // for the sentinel would decode every unrecognised value as 'Unknown'
+      expect(result.content).toContain("@JsonValue('Unknown')\n  unknown,");
+      expect(result.content).toContain("@JsonValue('unknown')\n  unknown2");
+      expect(result.content).toContain('if (value == null) return Cased.unknown2;');
+      expect(result.content).toContain('default:\n        return Cased.unknown2;');
+    });
+
+    it('should reuse a declared unknown value as the sentinel', () => {
+      const result = generator.generateEnum('Declared', ['unknown', 'active'], undefined, 'string');
+
+      expect(result.content.match(/@JsonValue\('unknown'\)/g)?.length).toBe(1);
+      // The sentinel is what the default arm returns, so it gets no case
+      expect(result.content).not.toContain("case 'unknown':");
+      expect(result.content).toContain('default:\n        return Declared.unknown;');
+    });
+  });
+
+  describe('a parameter whose enum Dart cannot express', () => {
+    const paramSpec = {
+      openapi: '3.0.0',
+      info: { title: 'Test API', version: '1.0.0' },
+      paths: {
+        '/r': {
+          get: {
+            operationId: 'getR',
+            parameters: [
+              { name: 'ratio', in: 'query', schema: { type: 'number', enum: [1.5, 2.5] } }
+            ],
+            responses: { '200': { description: 'ok' } }
+          }
+        }
+      },
+      components: { schemas: {} }
+    } as any;
+
+    it('should still emit the type the parameter model refers to', async () => {
+      const files = await generateDartCode({
+        input: paramSpec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
+
+      // endpoint-generator names a parameter's enum type by convention rather
+      // than from what got generated, so the file has to exist either way
+      const params = files.find(f => f.path === 'models/params/get_r_params.f.dart');
+      expect(params!.content).toContain('GetRRatioEnum? ratio,');
+      expect(params!.content).toContain("import '../get_r_ratio_enum.f.dart';");
+
+      const enumFile = files.find(f => f.path === 'models/get_r_ratio_enum.f.dart');
+      expect(enumFile!.content).toContain('typedef GetRRatioEnum = double;');
+    });
+  });
+
+  describe('an enum as a response type', () => {
+    const jsonResponse = (ref: string) => ({
+      description: 'ok',
+      content: { 'application/json': { schema: { $ref: ref } } }
+    });
+    const responseSpec = {
+      openapi: '3.0.0',
+      info: { title: 'Test API', version: '1.0.0' },
+      paths: {
+        '/ratio': { get: { operationId: 'getRatio', responses: { '200': jsonResponse('#/components/schemas/RatioScale') } } },
+        '/flag': { get: { operationId: 'getFlag', responses: { '200': jsonResponse('#/components/schemas/Bools') } } }
+      },
+      components: {
+        schemas: {
+          RatioScale: { type: 'number', enum: [1.5, 2.5] },
+          Bools: { type: 'boolean', enum: [true, false] }
+        }
+      }
+    } as any;
+
+    it('should keep the type the values have', async () => {
+      const files = await generateDartCode({
+        input: responseSpec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
+
+      // Calling a decimal enum a String made the cast throw at runtime
+      const service = files.find(f => f.path === 'services/default_service.dart');
+      expect(service!.content).toContain('Future<double> getRatio(');
+      expect(service!.content).toContain('return response.data as double;');
+      expect(service!.content).toContain('Future<bool> getFlag(');
+      expect(service!.content).toContain('return response.data as bool;');
+      expect(service!.content).not.toContain('as String;');
+    });
+  });
+
+  describe('a header parameter with an enum', () => {
+    const headerSpec = {
+      openapi: '3.0.0',
+      info: { title: 'Test API', version: '1.0.0' },
+      paths: {
+        '/s': {
+          get: {
+            operationId: 'getStatus',
+            parameters: [
+              { name: 'X-Mode', in: 'header', schema: { type: 'string', enum: ['a', 'b'] } }
+            ],
+            responses: { '200': { description: 'ok' } }
+          }
+        }
+      },
+      components: { schemas: {} }
+    } as any;
+
+    it('should spell the type the same way the model declares it', async () => {
+      const files = await generateDartCode({
+        input: headerSpec,
+        output: { target: './test', mode: 'split', client: 'dio' }
+      } as any);
+
+      // The declaration goes through toDartClassName, which reads XMo as an
+      // acronym - the reference has to be normalised the same way
+      const headers = files.find(f => f.path === 'models/headers/get_status_headers.f.dart');
+      expect(headers!.content).toContain('GetSxModeEnum? xMode,');
+      expect(headers!.content).toContain("import '../get_sx_mode_enum.f.dart';");
+
+      const enumFile = files.find(f => f.path === 'models/get_sx_mode_enum.f.dart');
+      expect(enumFile!.content).toContain('enum GetSxModeEnum {');
+    });
+  });
+
+  it('should drop a null value from a string enum', () => {
+    const result = generator.generateEnum('Nullable', ['null', null], undefined, 'string');
+
+    // The string 'null' keeps its member; the actual null gets none, since
+    // json_serializable decodes a null source to Dart null regardless
+    expect(result.content.match(/@JsonValue\('null'\)/g)?.length).toBe(1);
+    expect(result.content).not.toContain('@JsonValue(null)');
   });
 });

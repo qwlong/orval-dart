@@ -7,6 +7,7 @@ import { DartModel, DartProperty, GeneratedFile } from '../types';
 import { TypeMapper } from '../utils';
 import { ReferenceResolver } from '../resolvers';
 import { TemplateManager } from '../templates/template-manager';
+import { buildEnumMembers, scalarTypeOfEnumSchema, uniqueEnumMemberName } from '../getters/enum';
 
 export class ModelGenerator {
   private templateManager: TemplateManager;
@@ -90,6 +91,25 @@ export class ModelGenerator {
 
     const content = `// Generated typedef for empty object schema
 ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} = Map<String, dynamic>;
+`;
+
+    return {
+      path: `models/${fileName}.f.dart`,
+      content
+    };
+  }
+
+  /**
+   * Emit a typedef for an enum Dart cannot express, so `$ref`s to it still
+   * resolve and the value simply keeps its scalar type.
+   */
+  generateScalarTypedef(name: string, schema: OpenAPIV3.SchemaObject): GeneratedFile {
+    const className = TypeMapper.toDartClassName(name);
+    const fileName = TypeMapper.toSnakeCase(name);
+    const dartType = scalarTypeOfEnumSchema(schema, TypeMapper.mapType.bind(TypeMapper));
+
+    const content = `// Generated typedef: the enum values have no @JsonValue representation
+${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} = ${dartType};
 `;
 
     return {
@@ -289,7 +309,7 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
    */
   generateEnum(
     name: string,
-    values: (string | number | null)[],
+    values: (string | number | boolean | null)[],
     description?: string,
     type?: string
   ): GeneratedFile {
@@ -306,84 +326,41 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
       nonNullValues.length > 0 &&
       nonNullValues.every(value => typeof value === 'number');
     
-    // Convert enum values to valid Dart enum names
-    const enumValues = values.map(value => {
-      // Handle null values
-      if (value === null || value === 'null') {
-        return {
-          name: 'nullValue',
-          value: 'null',
-          description: 'Null value'
-        };
-      }
-      
-      // Handle empty string
-      if (value === '') {
-        return {
-          name: 'empty',
-          value: '',
-          description: 'Empty string'
-        };
-      }
-      
-      // Start with the original value
-      let dartName = String(value);
-      
-      // Handle numeric-only values or values starting with numbers
-      if (/^\d/.test(dartName)) {
-        dartName = `value${dartName.charAt(0).toUpperCase() + dartName.slice(1)}`;
-      }
-      
-      // Replace special characters with underscores
-      dartName = dartName
-        .replace(/[^a-zA-Z0-9_]/g, '_')  // Replace non-alphanumeric with underscore
-        .replace(/_+/g, '_')              // Replace multiple underscores with single
-        .replace(/^_+|_+$/g, '');         // Remove leading/trailing underscores
-      
-      // Convert to camelCase for Dart enum convention
-      // Split by underscore and capitalize each part except first
-      const parts = dartName.split('_');
-      dartName = parts[0].toLowerCase() + parts.slice(1).map(p => 
-        p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()
-      ).join('');
-      
-      // Ensure it doesn't start with uppercase
-      if (dartName.charAt(0).match(/[A-Z]/)) {
-        dartName = dartName.charAt(0).toLowerCase() + dartName.slice(1);
-      }
-      
-      return {
-        name: dartName,
-        value: value,
-        description: undefined
-      };
-    });
+    const enumValues = buildEnumMembers(values);
+    const usedNames = new Set(enumValues.map(member => member.name));
 
     // Add 'unknown' fallback value for forward compatibility
     // This ensures that if the backend adds new enum values, the client won't crash
     // Numeric enums have no spare value to use as a sentinel, so fromValue
     // returns null for them instead
-    const hasUnknown = enumValues.some(v => v.name === 'unknown');
-    if (!hasUnknown && !isNumeric) {
-      enumValues.push({
-        name: 'unknown',
-        value: 'unknown',
-        description: 'Unknown value for forward compatibility'
-      });
+    //
+    // The sentinel is the member carrying the value 'unknown', which the spec
+    // may already declare. Looking it up by member name instead would miss it:
+    // de-duplication renames, so `enum: ['Unknown']` yields a member spelled
+    // `unknown` that stands for a real value, and mistaking it for the sentinel
+    // drops the fallback and decodes anything unrecognised as 'Unknown'.
+    let unknownName: string | undefined;
+    if (!isNumeric) {
+      const declared = enumValues.find(v => v.value === 'unknown');
+      if (declared) {
+        unknownName = declared.name;
+      } else {
+        unknownName = uniqueEnumMemberName('unknown', usedNames);
+        enumValues.push({
+          name: unknownName,
+          value: 'unknown',
+          description: 'Unknown value for forward compatibility'
+        });
+      }
     }
-
-    // json_serializable decodes a null source to Dart null without consulting
-    // the value map, so a nullValue member would be unreachable through
-    // fromJson. Dart's own null is the single spelling for absent instead.
-    const renderedValues = isNumeric
-      ? enumValues.filter(v => v.name !== 'nullValue')
-      : enumValues;
 
     const templateData = {
       enumName,
       description,
-      values: renderedValues,
-      isNumeric
+      values: enumValues,
+      // Numbers render as bare Dart literals, strings stay quoted
+      isNumeric,
+      unknownName
     };
     
     const content = this.templateManager.render('freezed-enum', templateData);

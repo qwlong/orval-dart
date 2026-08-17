@@ -9,7 +9,7 @@ import { OpenAPIParser } from '../parser/openapi-parser';
 import { ReferenceResolver } from '../resolvers';
 import { combineSchemas } from '../getters/combine';
 import { getObject } from '../getters/object';
-import { hasComposition, hasDiscriminatedUnion, isEnum, isEmpty } from '../utils/assertion';
+import { hasComposition, hasDiscriminatedUnion, isEnum, isRepresentableEnum, isEmpty } from '../utils/assertion';
 import { TypeMapper } from '../utils';
 
 // Helper functions
@@ -115,7 +115,7 @@ function extractInlineEnums(
       if (subSchema.properties) {
         Object.entries(subSchema.properties).forEach(([propName, propSchema]: [string, any]) => {
           // Check if this is an inline enum (has enum array but no $ref)
-          if (propSchema.enum && Array.isArray(propSchema.enum) && !propSchema.$ref) {
+          if (isRepresentableEnum(propSchema) && !propSchema.$ref) {
             // Generate a name for the enum type
             const enumTypeName = `${parentName}${propName.charAt(0).toUpperCase()}${propName.slice(1)}Enum`;
 
@@ -140,7 +140,7 @@ function extractInlineEnums(
   if (schema.properties) {
     Object.entries(schema.properties).forEach(([propName, propSchema]: [string, any]) => {
       // Check if this is an inline enum (has enum array but no $ref)
-      if (propSchema.enum && Array.isArray(propSchema.enum) && !propSchema.$ref) {
+      if (isRepresentableEnum(propSchema) && !propSchema.$ref) {
         // Generate a name for the enum type
         const enumTypeName = `${parentName}${propName.charAt(0).toUpperCase()}${propName.slice(1)}Enum`;
 
@@ -223,11 +223,21 @@ function processParametersForEnums(
     const pathPart = TypeMapper.toDartClassName(pathContext);
     const paramName = TypeMapper.toDartClassName(paramObj.name);
 
-    // Format: {Method}{PathContext}{ParamName}Enum
-    const uniqueEnumTypeName = `${methodPrefix}${pathPart}${paramName}Enum`;
+    // Format: {Method}{PathContext}{ParamName}Enum, normalised the same way
+    // endpoint-generator normalises the type it refers to
+    const uniqueEnumTypeName = TypeMapper.toDartClassName(
+      `${methodPrefix}${pathPart}${paramName}Enum`
+    );
 
     // Check if this parameter has an inline enum (not a reference)
-    if (schema.enum && Array.isArray(schema.enum) && !('$ref' in schema)) {
+    //
+    // Every enum gets registered, representable or not. A parameter's Dart type
+    // is `{Method}{Path}{Param}Enum` by convention, decided independently in
+    // endpoint-generator, so skipping registration here would leave that name
+    // and its import pointing at a file nobody writes. Registered, it reaches
+    // the top-level branch below and comes out a typedef, the way an array of
+    // unrepresentable enum items already does.
+    if (isEnum(schema) && !('$ref' in schema)) {
       // Check if this exact enum already exists
       if (schemas[uniqueEnumTypeName]) {
         const existing = schemas[uniqueEnumTypeName];
@@ -347,10 +357,17 @@ export async function generateModels(
     // which generates typedef = Map<String, dynamic> for them
 
     // Check if it's an enum
+    if (isEnum(schema) && !isRepresentableEnum(schema)) {
+      // Decimals and booleans have no @JsonValue representation, so the values
+      // stay a server-side constraint and the schema keeps its scalar type
+      files.push(generator.generateScalarTypedef(name, schema));
+      return;
+    }
+
     if (isEnum(schema)) {
       const enumFile = generator.generateEnum(
         name,
-        schema.enum as (string | number | null)[],
+        schema.enum as (string | number | boolean | null)[],
         schema.description,
         schema.type as string | undefined
       );

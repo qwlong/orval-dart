@@ -5,6 +5,7 @@
 import type { OpenAPIV3 } from 'openapi-types';
 import { TypeMapper } from '../utils';
 import { ReferenceResolver } from '../resolvers';
+import { isEnum, scalarTypeOfEnumSchema } from '../getters/enum';
 
 export interface EndpointMethod {
   methodName: string;
@@ -785,7 +786,12 @@ export class EndpointGenerator {
       };
     }
 
-    const dartType = TypeMapper.mapType(schemaObj);
+    // An enum response keeps the type its values have. mapType answers String
+    // for anything carrying an enum, so a `type: number` enum came back as a
+    // String the generated cast then threw on.
+    const dartType = isEnum(schemaObj)
+      ? scalarTypeOfEnumSchema(schemaObj, TypeMapper.mapType.bind(TypeMapper))
+      : TypeMapper.mapType(schemaObj);
     const type = isNullable ? `${dartType}?` : dartType;
 
     // Check if it's a primitive
@@ -925,8 +931,13 @@ export class EndpointGenerator {
     const pathPart = TypeMapper.toDartClassName(pathContext);
     const paramName = TypeMapper.toDartClassName(param.name);
 
-    // Format: {Method}{PathContext}{ParamName}Enum
-    const uniqueEnumTypeName = `${methodPrefix}${pathPart}${paramName}Enum`;
+    // Format: {Method}{PathContext}{ParamName}Enum, normalised as a whole
+    // because that is what the declaration goes through. A header named
+    // `X-Flag` would otherwise leave GetRXFlagEnum here against the
+    // GetRxFlagEnum the model file declares.
+    const uniqueEnumTypeName = TypeMapper.toDartClassName(
+      `${methodPrefix}${pathPart}${paramName}Enum`
+    );
 
     // Check if this parameter has an inline enum
     // If so, return the enum type name that was generated in models.ts
