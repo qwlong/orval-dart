@@ -1,3 +1,17 @@
+## [0.10.4](https://github.com/qwlong/dorval/compare/v0.10.3...v0.10.4) (2026-08-17)
+
+
+### Bug Fixes
+
+* **core:** declare fromValue on the enum, not only the extension ([0c64325](https://github.com/qwlong/dorval/commit/0c64325e838a15ebfea8758b4df9159231cdd377))
+* **core:** emit enum values as Dart string literals ([c6ff624](https://github.com/qwlong/dorval/commit/c6ff624786df4e0a9c9fed73266fe0ce5d0f85ed)), closes [#x3](https://github.com/qwlong/dorval/issues/x3)
+* **core:** generate legal, unique enum member names ([095aff4](https://github.com/qwlong/dorval/commit/095aff4668b5016adc1b9c651be70096b3c9881d)), closes [#5](https://github.com/qwlong/dorval/issues/5)
+* **core:** give an enum response the type its values have ([604f46e](https://github.com/qwlong/dorval/commit/604f46e1790000418218b30ee0400d25b504146b))
+* **core:** give the unknown sentinel a member of its own ([15c3d29](https://github.com/qwlong/dorval/commit/15c3d295a2cb60c11c3e27e0657a4c6821897514))
+* **core:** keep a parameter's enum type resolvable ([4a50018](https://github.com/qwlong/dorval/commit/4a50018ce8d64823b7f8d55ce416d602215694fe))
+* **core:** only generate enums json_serializable can express ([b852433](https://github.com/qwlong/dorval/commit/b852433e2cadc4e1458b62c58d1271ac526336c2))
+* **core:** spell a parameter's enum type the same way on both sides ([12939ce](https://github.com/qwlong/dorval/commit/12939cebc3830339bef92b30e0896a85e4f82a72))
+
 ## [0.10.3](https://github.com/qwlong/dorval/compare/v0.10.2...v0.10.3) (2026-08-12)
 
 
