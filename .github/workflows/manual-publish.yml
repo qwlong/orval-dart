@@ -82,29 +82,7 @@ jobs:
         npm whoami
 
     - name: Publish packages to npm
-      run: |
-        # Publish core first (dependency for others)
-        echo "Publishing @dorval/core..."
-        cd packages/core
-        npm publish --access public --tag ${{ inputs.tag }}
-        cd ../..
-
-        # Publish other packages
-        echo "Publishing @dorval/dio..."
-        cd packages/dio
-        npm publish --access public --tag ${{ inputs.tag }} || echo "Failed to publish @dorval/dio (may not exist)"
-        cd ../..
-
-        echo "Publishing @dorval/custom..."
-        cd packages/custom
-        npm publish --access public --tag ${{ inputs.tag }} || echo "Failed to publish @dorval/custom (may not exist)"
-        cd ../..
-
-        # Publish CLI last
-        echo "Publishing dorval CLI..."
-        cd packages/dorval
-        npm publish --access public --tag ${{ inputs.tag }}
-        cd ../..
+      run: bash scripts/publish-workspaces.sh ${{ inputs.tag }}
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
