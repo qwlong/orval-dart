@@ -59,20 +59,7 @@ jobs:
         git config --global user.name "github-actions[bot]"
 
     - name: Update versions in all packages
-      run: |
-        # Update root package.json
-        npm version ${{ inputs.version }} --no-git-tag-version
-
-        # Update all workspace packages
-        for pkg in packages/*; do
-          if [ -f "$pkg/package.json" ]; then
-            echo "Updating version in $pkg"
-            (cd "$pkg" && npm version ${{ inputs.version }} --no-git-tag-version)
-          fi
-        done
-
-        # Or use the sync script if available
-        # yarn version:sync
+      run: node scripts/version.js ${{ inputs.version }}
 
     - name: Configure npm authentication
       env:
