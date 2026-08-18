@@ -1,3 +1,11 @@
+## [0.10.8](https://github.com/qwlong/dorval/compare/v0.10.7...v0.10.8) (2026-08-18)
+
+
+### Bug Fixes
+
+* **ci:** drop the stray package-lock.json and stop committing untracked files ([fa88c65](https://github.com/qwlong/dorval/commit/fa88c65913d4522256b0fb82334445fd234dd593))
+* **ci:** set versions from one script in both publish paths ([3810ed6](https://github.com/qwlong/dorval/commit/3810ed65af99264fac79d20214f58cab7d65df9f))
+
 ## [0.10.6](https://github.com/qwlong/dorval/compare/v0.10.5...v0.10.6) (2026-08-18)
 
 

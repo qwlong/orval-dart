@@ -1,6 +1,6 @@
 {
   "name": "@dorval/custom",
-  "version": "0.10.7",
+  "version": "0.10.8",
   "description": "Custom client implementation for Dorval",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -10,7 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@dorval/core": "*"
+    "@dorval/core": "^0.10.8"
   },
   "devDependencies": {
     "tsup": "^8.0.1",
