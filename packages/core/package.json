@@ -1,6 +1,6 @@
 {
   "name": "@dorval/core",
-  "version": "0.10.6",
+  "version": "0.10.7",
   "description": "Core Dart/Flutter code generation library for OpenAPI specifications",
   "keywords": [
     "dart",

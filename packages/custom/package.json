@@ -1,6 +1,6 @@
 {
   "name": "@dorval/custom",
-  "version": "0.10.6",
+  "version": "0.10.7",
   "description": "Custom client implementation for Dorval",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
