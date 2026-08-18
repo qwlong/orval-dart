@@ -68,3 +68,6 @@ CLAUDE.md
 # Temporary generated files
 flow-api.openapi.json
 generated-*.zip
+
+# npm is not used here - a stray lockfile makes turbo refuse to resolve workspaces
+package-lock.json
