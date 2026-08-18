@@ -33,7 +33,7 @@
       "@semantic-release/exec",
       {
         "prepareCmd": "for pkg in packages/*; do if [ -f \"$pkg/package.json\" ]; then (cd \"$pkg\" && npm version ${nextRelease.version} --no-git-tag-version); fi; done && sed -i.bak 's/\"@dorval\\/core\": \"[^\"]*\"/\"@dorval\\/core\": \"^'${nextRelease.version}'\"/' packages/dorval/package.json && rm packages/dorval/package.json.bak && yarn install --mode=update-lockfile",
-        "publishCmd": "npm publish --workspaces --access public"
+        "publishCmd": "bash scripts/publish-workspaces.sh"
       }
     ],
     [
