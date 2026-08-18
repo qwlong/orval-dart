@@ -1,3 +1,10 @@
+## [0.10.6](https://github.com/qwlong/dorval/compare/v0.10.5...v0.10.6) (2026-08-18)
+
+
+### Bug Fixes
+
+* **ci:** publish workspaces one at a time, skipping what is already out ([ffeee75](https://github.com/qwlong/dorval/commit/ffeee75ab78b9a159ba651ea5abca954724a6334))
+
 ## [0.10.5](https://github.com/qwlong/dorval/compare/v0.10.4...v0.10.5) (2026-08-17)
 
 
