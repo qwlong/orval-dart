@@ -100,6 +100,35 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
   }
 
   /**
+   * Emit a typedef for a schema whose whole body is a `$ref`.
+   *
+   * The re-export is load-bearing. Freezed writes its output as a `part of` the
+   * referring model, and a typedef resolves to the underlying class there, so
+   * that class has to be in the referring file's scope. Reaching it through the
+   * alias import alone leaves json_serializable seeing an InvalidType.
+   */
+  generateRefAliasTypedef(name: string, schema: OpenAPIV3.SchemaObject): GeneratedFile {
+    const className = TypeMapper.toDartClassName(name);
+    const fileName = TypeMapper.toSnakeCase(name);
+
+    const targetName = TypeMapper.extractTypeFromRef((schema as any).$ref);
+    const targetClass = TypeMapper.toDartClassName(targetName);
+    const targetFile = `${TypeMapper.toSnakeCase(targetName)}.f.dart`;
+
+    const content = `// Generated typedef: this schema is an alias for another
+import '${targetFile}';
+export '${targetFile}';
+
+${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} = ${targetClass};
+`;
+
+    return {
+      path: `models/${fileName}.f.dart`,
+      content
+    };
+  }
+
+  /**
    * Emit a typedef for an enum Dart cannot express, so `$ref`s to it still
    * resolve and the value simply keeps its scalar type.
    */

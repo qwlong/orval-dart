@@ -225,6 +225,31 @@ export function shouldCreateInterface(schema: OpenAPIV3.SchemaObject): boolean {
 /**
  * Check if schema is empty (no meaningful content)
  */
+/**
+ * Keys that can sit next to a `$ref` without making the schema more than an
+ * alias. `id` is what nestjs-zod emits when a DTO is aliased under a new name.
+ */
+const REF_ALIAS_METADATA_KEYS = new Set([
+  '$ref', '$id', '$schema', '$comment', 'id', 'title', 'description',
+  'example', 'examples', 'deprecated', 'readOnly', 'writeOnly', 'default'
+]);
+
+/**
+ * Whether a schema is nothing but a reference to another one.
+ *
+ * OpenAPI 3.1 allows keywords alongside `$ref`, so `{ id, $ref }` is a whole
+ * schema body that means "another name for that one". Anything carrying real
+ * constraints of its own is not an alias but a reference with an override, and
+ * is left to the paths that already handle it.
+ */
+export function isRefAlias(schema: any): boolean {
+  if (!schema || typeof schema !== 'object' || typeof schema.$ref !== 'string') {
+    return false;
+  }
+
+  return Object.keys(schema).every(key => REF_ALIAS_METADATA_KEYS.has(key));
+}
+
 export function isEmpty(schema: any): boolean {
   if (!isSchema(schema)) return true;
   

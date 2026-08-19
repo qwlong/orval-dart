@@ -9,7 +9,7 @@ import { OpenAPIParser } from '../parser/openapi-parser';
 import { ReferenceResolver } from '../resolvers';
 import { combineSchemas } from '../getters/combine';
 import { getObject } from '../getters/object';
-import { hasComposition, hasDiscriminatedUnion, isEnum, isRepresentableEnum, isEmpty } from '../utils/assertion';
+import { hasComposition, hasDiscriminatedUnion, isEnum, isRefAlias, isRepresentableEnum, isEmpty } from '../utils/assertion';
 import { TypeMapper } from '../utils';
 
 // Helper functions
@@ -298,6 +298,16 @@ export async function generateModels(
   const parser = new OpenAPIParser();
   await parser.parseWithoutDereference(spec);
   const schemas = parser.getSchemas();
+
+  // getSchemas() drops every schema whose body is a `$ref`. At the top level
+  // one of those is an alias, and referring properties still name it, so it
+  // needs a file of its own - put those back.
+  const specSchemas = (spec.components?.schemas ?? {}) as Record<string, any>;
+  Object.entries(specSchemas).forEach(([name, schema]) => {
+    if (!schemas[name] && isRefAlias(schema)) {
+      schemas[name] = schema;
+    }
+  });
   
   // Create ReferenceResolver with the full spec
   const refResolver = new ReferenceResolver(spec);
@@ -347,6 +357,14 @@ export async function generateModels(
   
   // Generate model for each schema
   Object.entries(schemas).forEach(([name, schema]) => {
+    // A schema whose body is just a `$ref` is another name for the target, and
+    // referring properties keep that name. Skipping it as "empty" left them
+    // importing a file nobody wrote.
+    if (isRefAlias(schema)) {
+      files.push(generator.generateRefAliasTypedef(name, schema));
+      return;
+    }
+
     // Skip completely empty schemas (no type, no properties, no composition)
     if (isEmpty(schema)) {
       console.log(`Skipping empty model: ${name}`);
