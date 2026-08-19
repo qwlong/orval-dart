@@ -36,7 +36,15 @@ export function createTypeScriptLoader(primary: Loader = defaultLoaders['.ts']):
     } catch (error) {
       const stripped = await stripTypesWithNode(content);
       if (stripped === undefined) {
-        throw error;
+        // Node below 22.13 has no type stripping either, so say what happened
+        // rather than surfacing a bare `findConfigFile is not a function`
+        throw new Error(
+          `Could not load ${filepath}.\n` +
+          `The installed typescript package could not transpile it: ${(error as Error).message}\n` +
+          `TypeScript 7 moved the compiler to a native binary and its JavaScript API is gone, ` +
+          `and this Node (${process.version}) has no built-in type stripping to fall back on.\n` +
+          `Use Node 22.13 or newer, install typescript 5.x, or write the config as .mjs, .js or .json.`
+        );
       }
 
       // Written next to the config so its relative imports still resolve

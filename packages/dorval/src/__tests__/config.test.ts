@@ -49,7 +49,7 @@ describe('a TypeScript config file', () => {
     expect(await loadConfig()).toEqual(EXPECTED);
   });
 
-  it('should still load when the typescript package cannot transpile', async () => {
+  it('should handle a typescript package that cannot transpile', async () => {
     // What TypeScript 7 does: the compiler moved to a native binary and the
     // main entry exports only `version`, so cosmiconfig's loader dies on
     // `typescript.findConfigFile is not a function`
@@ -57,13 +57,21 @@ describe('a TypeScript config file', () => {
       throw new TypeError('typescript.findConfigFile is not a function');
     });
     const loader = createTypeScriptLoader(primary);
+    const load = () => loader(join(dir, 'dorval.config.ts'), TS_CONFIG);
 
-    const loaded = await loader(join(dir, 'dorval.config.ts'), TS_CONFIG);
+    const canStripTypes = typeof (await import('node:module') as any).stripTypeScriptTypes === 'function';
+
+    if (canStripTypes) {
+      const loaded = await load();
+      expect((loaded as any).petstore).toEqual(EXPECTED);
+      // and it leaves nothing behind next to the config
+      expect(await readdir(dir)).toEqual(['dorval.config.ts']);
+    } else {
+      // Node below 22.13 cannot strip types either - the error has to say so
+      await expect(load()).rejects.toThrow(/Use Node 22\.13 or newer/);
+    }
 
     expect(primary).toHaveBeenCalled();
-    expect((loaded as any).petstore).toEqual(EXPECTED);
-    // and it leaves nothing behind next to the config
-    expect(await readdir(dir)).toEqual(['dorval.config.ts']);
   });
 
 });
