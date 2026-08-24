@@ -1,6 +1,7 @@
 /**
  * Schema resolver for handling complex OpenAPI schema structures
  */
+import { TypeMapper } from '../utils/type-mapper';
 
 
 export interface ResolvedSchema {
@@ -257,8 +258,8 @@ export class SchemaResolver {
     }
     
     // Handle nullable
-    if (schema.nullable && !dartType.endsWith('?')) {
-      dartType += '?';
+    if (schema.nullable) {
+      dartType = TypeMapper.toNullable(dartType);
     }
     
     return {

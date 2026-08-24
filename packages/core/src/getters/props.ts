@@ -2,6 +2,7 @@
  * Properties handling - aligned with Orval structure
  * Processes and organizes method properties/parameters
  */
+import { TypeMapper } from '../utils/type-mapper';
 
 
 export enum PropType {
@@ -83,7 +84,7 @@ export function getProps(
   const queryProps = queryParams.map(param => ({
     name: param.dartName || param.name,
     type: param.type,
-    dartType: param.nullable ? `${param.type}?` : param.type,
+    dartType: param.nullable ? TypeMapper.toNullable(param.type) : param.type,
     required: param.required || false,
     nullable: param.nullable,
     defaultValue: param.defaultValue,
@@ -97,7 +98,7 @@ export function getProps(
   const headerProps = headerParams.map(param => ({
     name: param.dartName || param.name,
     type: param.type,
-    dartType: param.nullable ? `${param.type}?` : param.type,
+    dartType: param.nullable ? TypeMapper.toNullable(param.type) : param.type,
     required: param.required || false,
     nullable: param.nullable,
     defaultValue: param.defaultValue,
@@ -111,7 +112,7 @@ export function getProps(
   const cookieProps = cookieParams.map(param => ({
     name: param.dartName || param.name,
     type: param.type,
-    dartType: param.nullable ? `${param.type}?` : param.type,
+    dartType: param.nullable ? TypeMapper.toNullable(param.type) : param.type,
     required: param.required || false,
     nullable: param.nullable,
     defaultValue: param.defaultValue,

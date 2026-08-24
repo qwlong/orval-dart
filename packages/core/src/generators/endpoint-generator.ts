@@ -576,7 +576,7 @@ export class EndpointGenerator {
       // Add nullable marker to the type and set isNullable flag
       return {
         ...baseResult,
-        type: baseResult.type.endsWith('?') ? baseResult.type : `${baseResult.type}?`,
+        type: TypeMapper.toNullable(baseResult.type),
         isNullable: true
       };
     }
@@ -597,7 +597,7 @@ export class EndpointGenerator {
         });
         return {
           ...baseResult,
-          type: baseResult.type.endsWith('?') ? baseResult.type : `${baseResult.type}?`,
+          type: TypeMapper.toNullable(baseResult.type),
           isNullable: true
         };
       }
@@ -619,7 +619,7 @@ export class EndpointGenerator {
       if (isNullable && !baseResult.type.endsWith('?')) {
         return {
           ...baseResult,
-          type: `${baseResult.type}?`,
+          type: TypeMapper.toNullable(baseResult.type),
           isNullable: true
         };
       }
@@ -641,7 +641,7 @@ export class EndpointGenerator {
       if (isEmptyObject) {
         // This is a typedef to Map<String, dynamic>, not a model with fromJson
         const dartType = 'Map<String, dynamic>';
-        const type = isNullable ? `${dartType}?` : dartType;
+        const type = isNullable ? TypeMapper.toNullable(dartType) : dartType;
         return {
           type,
           dataType: undefined,
@@ -654,7 +654,7 @@ export class EndpointGenerator {
       }
 
       // Normal model reference
-      const type = isNullable ? `${modelName}?` : modelName;
+      const type = isNullable ? TypeMapper.toNullable(modelName) : modelName;
       return {
         type,
         dataType: modelName, // Always use non-nullable for fromJson
@@ -681,7 +681,7 @@ export class EndpointGenerator {
       if (isEmptyObject) {
         // This is a typedef to Map<String, dynamic>, not a model with fromJson
         const dartType = 'Map<String, dynamic>';
-        const type = isNullable ? `${dartType}?` : dartType;
+        const type = isNullable ? TypeMapper.toNullable(dartType) : dartType;
         return {
           type,
           dataType: undefined,
@@ -694,7 +694,7 @@ export class EndpointGenerator {
       }
 
       // Normal model reference
-      const type = isNullable ? `${modelName}?` : modelName;
+      const type = isNullable ? TypeMapper.toNullable(modelName) : modelName;
       return {
         type,
         dataType: modelName, // Always use non-nullable for fromJson
@@ -733,7 +733,7 @@ export class EndpointGenerator {
         dataType = `List<${itemType}>`;
       }
 
-      const type = isNullable ? `${dataType}?` : dataType;
+      const type = isNullable ? TypeMapper.toNullable(dataType) : dataType;
       return {
         type,
         dataType,  // Non-nullable data type for processing
@@ -763,7 +763,7 @@ export class EndpointGenerator {
       }
 
       if (modelName) {
-        const type = isNullable ? `${modelName}?` : modelName;
+        const type = isNullable ? TypeMapper.toNullable(modelName) : modelName;
         return {
           type,
           dataType: modelName,  // Always use non-nullable for fromJson
@@ -780,7 +780,7 @@ export class EndpointGenerator {
     if (schemaObj.type === 'object' && !schemaObj.properties) {
       // This is likely a Map<String, dynamic>
       const dartType = 'Map<String, dynamic>';
-      const type = isNullable ? `${dartType}?` : dartType;
+      const type = isNullable ? TypeMapper.toNullable(dartType) : dartType;
       return {
         type,
         dataType: undefined,
@@ -798,7 +798,7 @@ export class EndpointGenerator {
     const dartType = isEnum(schemaObj)
       ? scalarTypeOfEnumSchema(schemaObj, TypeMapper.mapType.bind(TypeMapper))
       : TypeMapper.mapType(schemaObj);
-    const type = isNullable ? `${dartType}?` : dartType;
+    const type = isNullable ? TypeMapper.toNullable(dartType) : dartType;
 
     // Check if it's a primitive
     const primitiveTypes = ['String', 'int', 'double', 'bool', 'num'];

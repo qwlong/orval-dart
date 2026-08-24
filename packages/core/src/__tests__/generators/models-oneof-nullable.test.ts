@@ -360,9 +360,10 @@ describe('OneOf Nullable Pattern', () => {
 
       const model = files.find(f => f.path === 'models/complex_model.f.dart');
       expect(model).toBeDefined();
-      // Complex unions should still be dynamic
-      expect(model?.content).toContain('dynamic? unionField');
-      expect(model?.content).toContain('dynamic? multiUnion');
+      // Complex unions should still be dynamic, and dynamic carries no `?`
+      expect(model?.content).toContain('dynamic unionField');
+      expect(model?.content).toContain('dynamic multiUnion');
+      expect(model?.content).not.toContain('dynamic?');
     });
 
     it('should handle anyOf nullable pattern similar to oneOf', async () => {

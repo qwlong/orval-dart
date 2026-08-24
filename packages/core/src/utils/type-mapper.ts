@@ -156,17 +156,24 @@ export class TypeMapper {
   }
 
   /**
+   * Make a Dart type nullable.
+   *
+   * `dynamic` already admits null, so a `?` on it is redundant and the
+   * analyzer reports it as `unnecessary_question_mark`.
+   */
+  static toNullable(type: string): string {
+    if (type === 'dynamic' || type.endsWith('?')) {
+      return type;
+    }
+    return `${type}?`;
+  }
+
+  /**
    * Map OpenAPI type to Dart type with null safety
    */
   static mapTypeWithNullability(schema: SchemaObject, required: boolean = true): string {
     const baseType = this.mapType(schema);
-    
-    // In Dart, add ? for nullable types
-    if (!required && baseType !== 'dynamic') {
-      return `${baseType}?`;
-    }
-    
-    return baseType;
+    return required ? baseType : this.toNullable(baseType);
   }
 
   /**

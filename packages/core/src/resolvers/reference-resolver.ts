@@ -238,7 +238,7 @@ export class ReferenceResolver {
    */
   getModelType(schema: any, nullable: boolean = true): string {
     const type = this.getDartType(schema);
-    return !nullable && type !== 'dynamic' ? `${type}?` : type;
+    return nullable ? type : TypeMapper.toNullable(type);
   }
   
   /**
@@ -437,7 +437,7 @@ export class ReferenceResolver {
           
           // Add nullable if not required
           if (!isRequired) {
-            type = `${type}?`;
+            type = TypeMapper.toNullable(type);
           }
         } else {
           type = 'dynamic';
@@ -465,16 +465,13 @@ export class ReferenceResolver {
               const className = TypeMapper.toDartClassName(modelName);
               const fileName = TypeMapper.toSnakeCase(modelName);
               imports.push(`${fileName}.f.dart`);
-              type = `${className}?`; // Already nullable due to oneOf with null
+              type = TypeMapper.toNullable(className); // Already nullable due to oneOf with null
             } else {
               type = 'dynamic';
             }
           } else {
             // Regular schema that's nullable
-            type = TypeMapper.mapType(nonNullSchema);
-            if (!type.endsWith('?')) {
-              type = `${type}?`;
-            }
+            type = TypeMapper.toNullable(TypeMapper.mapType(nonNullSchema));
           }
         } else {
           // Complex oneOf/anyOf - use dynamic for now
@@ -491,7 +488,7 @@ export class ReferenceResolver {
           
           // Add nullable if not required
           if (!isRequired) {
-            type = `${type}?`;
+            type = TypeMapper.toNullable(type);
           }
         } else {
           type = 'dynamic';
@@ -512,7 +509,7 @@ export class ReferenceResolver {
         
         // Add nullable if not required
         if (!isRequired) {
-          type = `${type}?`;
+          type = TypeMapper.toNullable(type);
         }
       } else {
         type = 'dynamic';
@@ -527,8 +524,8 @@ export class ReferenceResolver {
       const hasDefault = schema && schema.default !== undefined;
       const needsNullable = (!isRequired && !hasDefault) || isNullable;
 
-      if (needsNullable && !type.endsWith('?')) {
-        type = `${type}?`;
+      if (needsNullable) {
+        type = TypeMapper.toNullable(type);
       }
 
       // Check for special imports

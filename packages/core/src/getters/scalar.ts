@@ -4,6 +4,7 @@
  */
 
 import { OpenAPIV3 } from 'openapi-types';
+import { TypeMapper } from '../utils/type-mapper';
 
 export interface ScalarResult {
   type: string;
@@ -45,7 +46,7 @@ export function getScalar(
   const baseType = getBasicScalarType(schema);
   
   return {
-    type: schema.nullable ? `${baseType}?` : baseType,
+    type: schema.nullable ? TypeMapper.toNullable(baseType) : baseType,
     imports: [],
     nullable: schema.nullable,
     format: schema.format
@@ -75,7 +76,7 @@ function handleTypeArray(types: string[], schema: OpenAPIV3.SchemaObject): Scala
   if (nonNullTypes.length === 1) {
     const baseType = mapScalarType(nonNullTypes[0], schema.format);
     return {
-      type: hasNull ? `${baseType}?` : baseType,
+      type: hasNull ? TypeMapper.toNullable(baseType) : baseType,
       imports: [],
       nullable: hasNull
     };

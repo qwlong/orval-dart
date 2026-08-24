@@ -179,7 +179,7 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
           const propDetails = {} as OpenAPIV3.SchemaObject;
           const hasDefault = propDetails.default !== undefined;
           const needsNullable = !isRequired && !hasDefault;
-          dartType = needsNullable && !baseType.endsWith('?') ? `${baseType}?` : baseType;
+          dartType = needsNullable ? TypeMapper.toNullable(baseType) : baseType;
         } else {
           const prop = propSchema as OpenAPIV3.SchemaObject;
           
@@ -193,7 +193,7 @@ ${schema.description ? `/// ${schema.description}\n` : ''}typedef ${className} =
           // Determine if type should be nullable
           const hasDefault = prop.default !== undefined;
           const needsNullable = (!isRequired && !hasDefault) || isNullable;
-          dartType = needsNullable && !baseType.endsWith('?') ? `${baseType}?` : baseType;
+          dartType = needsNullable ? TypeMapper.toNullable(baseType) : baseType;
         }
         
         // Get property details from the schema

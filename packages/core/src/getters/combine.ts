@@ -4,6 +4,7 @@
  */
 
 import { TemplateManager } from '../templates/template-manager';
+import { TypeMapper } from '../utils/type-mapper';
 
 // Separator type matching Orval
 type Separator = 'allOf' | 'anyOf' | 'oneOf';
@@ -210,7 +211,7 @@ function handleNullablePattern(schemas: any[]): CombineResult {
   }
   
   return {
-    type: `${baseType}?`,
+    type: TypeMapper.toNullable(baseType),
     imports
   };
 }
