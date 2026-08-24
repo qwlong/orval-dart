@@ -4,6 +4,7 @@
  */
 
 import { OpenAPIV3 } from 'openapi-types';
+import { TypeMapper } from '../utils/type-mapper';
 
 export interface ArrayResult {
   type: string;
@@ -52,7 +53,7 @@ export function getArray(
   const listType = `List<${itemType}>`;
   
   return {
-    type: schema.nullable ? `${listType}?` : listType,
+    type: schema.nullable ? TypeMapper.toNullable(listType) : listType,
     imports,
     nullable: schema.nullable,
     itemType

@@ -171,11 +171,8 @@ function processProperty(
           dartType = TypeMapper.toDartClassName(typeName) + '?';
           importsSet.add(`${TypeMapper.toSnakeCase(typeName)}.f.dart`);
         } else {
-          dartType = getScalarType(nonNullSchema);
           // For oneOf/anyOf with null, the type is already nullable
-          if (!dartType.endsWith('?')) {
-            dartType += '?';
-          }
+          dartType = TypeMapper.toNullable(getScalarType(nonNullSchema));
           // Add imports if needed
           if (dartType.startsWith('List<') && !dartType.includes('Map<String, dynamic>')) {
             const innerType = TypeMapper.extractInnerType(dartType);
@@ -224,8 +221,8 @@ function processProperty(
   const isOneOfNullable = (propSchema.oneOf || propSchema.anyOf) && dartType.endsWith('?');
   const nullable = !isRequired || propSchema.nullable === true || isOneOfNullable;
   // Only add ? if not already nullable and should be nullable
-  if (nullable && !dartType.endsWith('?') && !isOneOfNullable) {
-    dartType += '?';
+  if (nullable && !isOneOfNullable) {
+    dartType = TypeMapper.toNullable(dartType);
   }
   
   return {

@@ -189,9 +189,7 @@ function getResponseType(
     const nonNullSchema = TypeMapper.getNonNullTypeFromOneOf(schema);
     const baseTypeInfo = getResponseType(nonNullSchema, operationName);
     // Mark as nullable by adding ? to the type
-    const nullableType = baseTypeInfo.type.endsWith('?')
-      ? baseTypeInfo.type
-      : `${baseTypeInfo.type}?`;
+    const nullableType = TypeMapper.toNullable(baseTypeInfo.type);
     return {
       type: nullableType,
       imports: baseTypeInfo.imports,
@@ -206,9 +204,7 @@ function getResponseType(
 
     if (hasNull && nonNullSchema) {
       const baseTypeInfo = getResponseType(nonNullSchema as any, operationName);
-      const nullableType = baseTypeInfo.type.endsWith('?')
-        ? baseTypeInfo.type
-        : `${baseTypeInfo.type}?`;
+      const nullableType = TypeMapper.toNullable(baseTypeInfo.type);
       return {
         type: nullableType,
         imports: baseTypeInfo.imports,
